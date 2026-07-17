@@ -18,7 +18,8 @@ model Profile {
   id             String       @id @default(uuid()) @db.Uuid
   name           String
   token          String
-  jid            String
+  jid            String       @unique()
+  about          String       @default("")
   active         Boolean      @default(true)
   subscriptionId String       @db.Uuid
   subscription   Subscription @relation(fields: [subscriptionId], references: [id])
