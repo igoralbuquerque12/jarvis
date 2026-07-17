@@ -14,27 +14,13 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function getActiveValue(): boolean {
-  const value = process.env.SEED_PROFILE_ACTIVE?.trim().toLowerCase();
-
-  if (!value || value === 'true') {
-    return true;
-  }
-
-  if (value === 'false') {
-    return false;
-  }
-
-  throw new Error('SEED_PROFILE_ACTIVE must be true or false.');
-}
-
 async function main(): Promise<void> {
   const databaseUrl = requiredEnv('DATABASE_URL');
   const profileInput = {
     name: requiredEnv('SEED_PROFILE_NAME'),
     token: requiredEnv('SEED_PROFILE_TOKEN'),
     jid: requiredEnv('SEED_PROFILE_JID'),
-    active: getActiveValue(),
+    active: true,
   };
   const prisma = new PrismaClient({
     adapter: new PrismaPg({ connectionString: databaseUrl }),
@@ -48,7 +34,7 @@ async function main(): Promise<void> {
       subscription ??
       (await prisma.subscription.create({
         data: {
-          name: 'free',
+          name: 'Free Tier',
           price: 0,
           limit: 100,
         },
