@@ -15,23 +15,25 @@ export class ProfileService {
     return this.prisma.profile.findMany();
   }
 
-  async findOne(id: string) {
-    const profile = await this.prisma.profile.findUnique({ where: { id } });
+  async findOne(filters: { id?: string; jid?: string }) {
+    const { id, jid } = filters;
 
-    if (!profile) {
-      throw new NotFoundException(`Profile ${id} not found`);
+    if (!id && !jid) {
+      throw new NotFoundException('Unique filter not provided');
     }
 
-    return profile;
+    return await this.prisma.profile.findUnique({
+      where: id ? { id } : { jid: jid! },
+    });
   }
 
   async update(id: string, data: UpdateProfileDto) {
-    await this.findOne(id);
+    await this.findOne({ id });
     return this.prisma.profile.update({ where: { id }, data });
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    await this.findOne({ id });
     return this.prisma.profile.delete({ where: { id } });
   }
 }
