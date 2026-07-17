@@ -1,29 +1,30 @@
 import {
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { WASocket } from '@whiskeysockets/baileys';
-import { WhatsappConnectionService } from './whatsapp-connection.service';
 
-type BaileysModule = typeof import('@whiskeysockets/baileys');
+import { WhatsappConnectionService } from './whatsapp-connection.service';
 
 @Injectable()
 export class WhatsappSenderService {
   private readonly logger = new Logger(WhatsappSenderService.name);
-  private baileysModule: BaileysModule | null = null;
+  constructor(
+    @Inject(forwardRef(() => WhatsappConnectionService))
+    private readonly connection: WhatsappConnectionService,
+  ) {}
 
-  constructor(private readonly connection: WhatsappConnectionService) {}
-
-  async sendMessage(phone: string, message: string): Promise<{ sent: true }> {
+  async sendMessage(jid: string, message: string): Promise<{ sent: true }> {
     const socket = this.connection.getSocket();
     if (!socket || !this.connection.isConnected()) {
       throw new ServiceUnavailableException('WhatsApp is not connected.');
     }
 
     try {
-      await socket.sendMessage(await this.toWhatsappJid(socket, phone), {
+      await socket.sendMessage(jid, {
         text: message,
       });
       return { sent: true };
@@ -36,33 +37,5 @@ export class WhatsappSenderService {
         'Failed to send WhatsApp message.',
       );
     }
-  }
-
-  private async toWhatsappJid(
-    socket: WASocket,
-    phone: string,
-  ): Promise<string> {
-    const requestedJid = `124687933767789@lid`; // TESTE
-    const { areJidsSameUser, jidDecode, jidNormalizedUser } =
-      await this.getBaileysModule();
-    const ownContact = socket.authState.creds.me ?? socket.user;
-    const ownJids = [
-      ownContact?.phoneNumber,
-      ownContact?.id,
-      ownContact?.lid,
-    ].filter((jid): jid is string => Boolean(jid));
-    const isOwnNumber = ownJids.some((ownJid) => {
-      const ownUser = jidDecode(ownJid)?.user;
-      return ownUser === phone || areJidsSameUser(requestedJid, ownJid);
-    });
-
-    return isOwnNumber
-      ? jidNormalizedUser(ownContact?.phoneNumber ?? ownContact?.id)
-      : requestedJid;
-  }
-
-  private async getBaileysModule(): Promise<BaileysModule> {
-    this.baileysModule ??= await import('@whiskeysockets/baileys');
-    return this.baileysModule;
   }
 }
