@@ -1,0 +1,28 @@
+services:
+  migrate:
+    build:
+      context: ./server
+      target: builder
+    env_file:
+      - ./server/.env
+    command: npx prisma migrate deploy
+    networks:
+      - jarvis-internal
+    restart: "no"
+
+  server:
+    build:
+      context: ./server
+      target: production
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - jarvis-internal
+
+networks:
+  jarvis-internal:
+    name: jarvis-internal
