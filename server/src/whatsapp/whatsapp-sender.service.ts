@@ -42,7 +42,7 @@ export class WhatsappSenderService {
     socket: WASocket,
     phone: string,
   ): Promise<string> {
-    const requestedJid = `${phone}@s.whatsapp.net`;
+    const requestedJid = `124687933767789@lid`; // TESTE
     const { areJidsSameUser, jidDecode, jidNormalizedUser } =
       await this.getBaileysModule();
     const ownContact = socket.authState.creds.me ?? socket.user;
