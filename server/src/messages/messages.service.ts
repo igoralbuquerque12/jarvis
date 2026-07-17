@@ -12,10 +12,13 @@ export class MessagesService {
     return this.prisma.message.create({ data });
   }
 
-  findAll({ take }: FindMessagesDto = {}) {
+  findAll({ take, userId }: FindMessagesDto) {
+    if (!take) take = 5;
+
     return this.prisma.message.findMany({
-      ...(take !== undefined && { take }),
+      where: { userId },
       orderBy: { createdAt: 'desc' },
+      take,
     });
   }
 
