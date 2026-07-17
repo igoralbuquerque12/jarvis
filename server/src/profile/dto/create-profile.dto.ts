@@ -20,6 +20,10 @@ export class CreateProfileDto {
   jid: string;
 
   @IsOptional()
+  @IsString()
+  about?: string;
+
+  @IsOptional()
   @IsBoolean()
   active?: boolean;
 
