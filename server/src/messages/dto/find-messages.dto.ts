@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class FindMessagesDto {
   @IsOptional()
@@ -7,4 +7,7 @@ export class FindMessagesDto {
   @IsInt()
   @Min(1)
   take?: number;
+
+  @IsString()
+  userId: string;
 }
