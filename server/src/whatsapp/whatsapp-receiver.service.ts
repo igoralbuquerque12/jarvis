@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { MessageUpsertType, WAMessage } from '@whiskeysockets/baileys';
+import { AssistantMainService } from '../assistant/services/assistant-main.service';
 
 @Injectable()
 export class WhatsappReceiverService {
+  constructor(private readonly assistantMainService: AssistantMainService) {}
+
   readonly handleMessagesUpsert = ({
     messages,
     type,
@@ -16,17 +19,35 @@ export class WhatsappReceiverService {
     }
 
     for (const message of messages) {
-      if (message.key.fromMe || !message.message) {
+      console.log('Received message:', message);
+      const from = message.key.remoteJid;
+      const messageId = message.key.id;
+
+      if (message.key.fromMe || !message.message || !from || !messageId) {
         continue;
       }
 
-      console.log({
-        from: message.key.remoteJid,
-        participant: message.key.participant,
-        messageId: message.key.id,
-        text: this.getText(message),
-        message,
-      });
+      const participant = message.key.participant ?? undefined;
+      const text = this.getText(message);
+      const dataMessage = {
+        from,
+        ...(participant !== undefined && { participant }),
+        messageId,
+        ...(text !== undefined && { text }),
+        message: {
+          key: {
+            remoteJid: from,
+            remoteJidAlt: message.key.remoteJidAlt ?? from,
+            remoteJidUsername: undefined,
+            fromMe: false as const,
+            id: messageId,
+          },
+          category: message.message.conversation ?? '',
+          messageTimestamp: Number(message.messageTimestamp ?? 0),
+        },
+        pushName: message.pushName ?? '',
+      };
+      void this.assistantMainService.receiveMessage(dataMessage);
     }
   };
 
