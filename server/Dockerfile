@@ -27,4 +27,4 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/dist ./dist
 
 USER node
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main.js"]
