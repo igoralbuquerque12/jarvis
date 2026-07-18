@@ -38,7 +38,7 @@ export class AssistantMainService {
 
       const lastMessages = await this.messagesService.findAll({
         userId: profile.id,
-        take: 5,
+        take: 10,
       });
 
       await this.messagesService.create({
