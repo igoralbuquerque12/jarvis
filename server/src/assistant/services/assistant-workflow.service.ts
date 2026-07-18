@@ -20,7 +20,7 @@ export class AssistantWorkflowService {
     if (!url || !key) {
       throw new Error('Assistant workflow URL or key is not defined');
     }
-    console.log('Fetching assistant workflow with payload:', payload, url);
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
