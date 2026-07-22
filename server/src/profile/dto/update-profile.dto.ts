@@ -1,3 +1,3 @@
-import { CreateProfileDto } from './create-profile.dto';
+import type { CreateProfileDto } from './create-profile.dto';
 
-export type UpdateProfileDto = Partial<CreateProfileDto>;
+export type UpdateProfileDto = Omit<Partial<CreateProfileDto>, 'userId'>;
