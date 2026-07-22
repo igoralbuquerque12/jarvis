@@ -7,6 +7,7 @@ import { MessagesService } from '../../messages/messages.service';
 import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import { AssistantWorkflowService } from './assistant-workflow.service';
 import { WhatsappSenderService } from '../../whatsapp/whatsapp-sender.service';
+import { AssistantConnectionService } from './assistant-connection.service';
 
 @Injectable()
 export class AssistantMainService {
@@ -17,6 +18,7 @@ export class AssistantMainService {
     private readonly messagesService: MessagesService,
     private readonly assistantWorkflowService: AssistantWorkflowService,
     private readonly whatsappSenderService: WhatsappSenderService,
+    private readonly assistantConnectionService: AssistantConnectionService,
   ) {}
 
   async receiveMessage(data: IncomingMessageDto) {
@@ -26,13 +28,25 @@ export class AssistantMainService {
 
       const profile = await this.profileService.findOne({ jid: data.from });
       if (!profile) {
-        this.logger.warn(
-          'Profile not found for JID: ' + data.from + ' - ',
-          data.pushName,
-        );
+        const connectionSuccess =
+          await this.assistantConnectionService.connectionAttempt(
+            currentMessage,
+            data.from,
+          );
+        if (!connectionSuccess) {
+          this.logger.warn(
+            `Profile not found trying to connect with message: ${currentMessage}.`,
+          );
+          return {
+            ok: false,
+            error: 'Connection failed.',
+          };
+        }
+
+        this.logger.log(`Profile connected successfully for a new user`);
         return {
-          ok: false,
-          error: 'Profile not found for JID.',
+          ok: true,
+          error: 'Connection established successfully.',
         };
       }
 

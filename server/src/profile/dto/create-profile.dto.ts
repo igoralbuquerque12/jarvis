@@ -21,6 +21,10 @@ export class CreateProfileDto {
 
   @IsOptional()
   @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsString()
   about?: string;
 
   @IsOptional()
