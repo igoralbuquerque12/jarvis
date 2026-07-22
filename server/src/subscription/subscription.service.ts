@@ -36,4 +36,22 @@ export class SubscriptionService {
     await this.findOne(id);
     return this.prisma.subscription.delete({ where: { id } });
   }
+
+  async ensureDefaultSubscription() {
+    const defaultSubscription = {
+      name: 'Free Tier',
+      price: 0,
+      limit: 100,
+    };
+
+    const existing = await this.prisma.subscription.findFirst({
+      where: { name: defaultSubscription.name },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    return this.create(defaultSubscription);
+  }
 }

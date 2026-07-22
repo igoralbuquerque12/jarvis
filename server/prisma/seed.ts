@@ -28,7 +28,7 @@ async function main(): Promise<void> {
 
   try {
     const subscription = await prisma.subscription.findFirst({
-      where: { name: 'free' },
+      where: { name: 'Free Tier' },
     });
     const freeSubscription =
       subscription ??
