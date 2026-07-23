@@ -84,6 +84,7 @@ model Profile {
   token          String        @unique
   jid            String        @unique
   about          String        @default("")
+  timezone       String        @default("America/Sao_Paulo")
   active         Boolean       @default(true)
   subscriptionId String        @db.Uuid
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
@@ -133,7 +134,6 @@ model EventSeries {
   startAt            DateTime
   recurrenceInterval Int?
   recurrenceMode     RecurrenceMode?
-  timezone           String
   active             Boolean          @default(true)
   profile            Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
   executions         EventExecution[]
