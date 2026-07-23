@@ -3,6 +3,7 @@ import { EventExecutionStatus, EventSeriesType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type ActiveExecutionFilters = {
+  profileId: string;
   type?: EventSeriesType;
   scheduledAtStart?: Date;
   scheduledAtEnd?: Date;
@@ -98,6 +99,7 @@ export class EventExecutionService {
           : {}),
         eventSeries: {
           active: true,
+          profileId: filters.profileId,
           ...(filters.type ? { type: filters.type } : {}),
         },
       },
@@ -110,7 +112,6 @@ export class EventExecutionService {
             startAt: true,
             recurrenceInterval: true,
             recurrenceMode: true,
-            timezone: true,
           },
         },
       },
