@@ -19,7 +19,10 @@ describe('EventsM2mService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('creates a UNIQUE series and its normalized first execution', async () => {
-    profile.findOne.mockResolvedValue({ id: 'profile-id' });
+    profile.findOne.mockResolvedValue({
+      id: 'profile-id',
+      timezone: 'America/Sao_Paulo',
+    });
     series.create.mockResolvedValue({ id: 'series-id' });
     executions.create.mockResolvedValue({ id: 'execution-id' });
 
@@ -28,7 +31,6 @@ describe('EventsM2mService', () => {
         profileId: 'profile-id',
         type: EventSeriesType.UNIQUE,
         startAt: '2026-07-25T09:06:00-03:00',
-        timezone: 'America/Sao_Paulo',
         content: 'Enviar relatório',
       }),
     ).resolves.toEqual({
@@ -48,14 +50,16 @@ describe('EventsM2mService', () => {
   });
 
   it('requires both recurrence fields for RECURRENCE', async () => {
-    profile.findOne.mockResolvedValue({ id: 'profile-id' });
+    profile.findOne.mockResolvedValue({
+      id: 'profile-id',
+      timezone: 'America/Sao_Paulo',
+    });
 
     await expect(
       service.createEvent({
         profileId: 'profile-id',
         type: EventSeriesType.RECURRENCE,
         startAt: '2026-07-25T09:00:00-03:00',
-        timezone: 'America/Sao_Paulo',
         content: 'Verificar pedidos',
         recurrenceInterval: 1,
       }),
@@ -76,22 +80,21 @@ describe('EventsM2mService', () => {
     );
   });
 
-  it('requires timezone when filtering a calendar day', async () => {
-    await expect(
-      service.findActiveEvents({ scheduledAt: '2026-07-25' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('filters active executions by local calendar day and type', async () => {
+  it('filters active executions by the profile local calendar day and type', async () => {
+    profile.findOne.mockResolvedValue({
+      id: 'profile-id',
+      timezone: 'America/Sao_Paulo',
+    });
     executions.findActive.mockResolvedValue([]);
 
     await service.findActiveEvents({
+      profileId: 'profile-id',
       scheduledAt: '2026-07-25',
-      timezone: 'America/Sao_Paulo',
       type: EventSeriesType.RECURRENCE,
     });
 
     expect(executions.findActive).toHaveBeenCalledWith({
+      profileId: 'profile-id',
       type: EventSeriesType.RECURRENCE,
       scheduledAtStart: new Date('2026-07-25T03:00:00.000Z'),
       scheduledAtEnd: new Date('2026-07-26T03:00:00.000Z'),
@@ -106,7 +109,6 @@ describe('EventsM2mService', () => {
         profileId: 'missing',
         type: EventSeriesType.UNIQUE,
         startAt: '2026-07-25T09:00:00-03:00',
-        timezone: 'America/Sao_Paulo',
         content: 'Mensagem',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
