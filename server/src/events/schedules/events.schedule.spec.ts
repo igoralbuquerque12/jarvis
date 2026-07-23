@@ -26,7 +26,7 @@ describe('EventsSchedule', () => {
     scheduledAt: new Date('2026-07-25T09:00:00Z'),
     content: 'Verificar pedidos',
     eventSeries: {
-      profile: { jid: '5511999999999' },
+      profile: { jid: '5511999999999', timezone: 'UTC' },
     },
   };
 
@@ -43,7 +43,6 @@ describe('EventsSchedule', () => {
       type: EventSeriesType.RECURRENCE,
       recurrenceMode: RecurrenceMode.HOUR,
       recurrenceInterval: 1,
-      timezone: 'UTC',
     });
   });
 
