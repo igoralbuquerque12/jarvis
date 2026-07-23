@@ -10,8 +10,8 @@ resultado do envio.
 
 ## Modelo e regras
 
-- `EventSeries` pertence a um `Profile`, tem tipo `UNIQUE` ou `RECURRENCE` e
-  preserva o timezone IANA usado para os cálculos.
+- `EventSeries` pertence a um `Profile`, tem tipo `UNIQUE` ou `RECURRENCE`.
+- O timezone IANA pertence ao `Profile` e tem `America/Sao_Paulo` como padrão.
 - `EventExecution` contém o conteúdo a enviar, `scheduledAt`, estado e o campo
   `observabilitys` para o motivo da falha.
 - Estados: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` e `CANCELLED`.
@@ -34,7 +34,6 @@ Cria uma série e a primeira execução `PENDING`.
   "profileId": "uuid",
   "type": "RECURRENCE",
   "startAt": "2026-07-25T09:05:00-03:00",
-  "timezone": "America/Sao_Paulo",
   "content": "Verificar novos pedidos",
   "recurrenceInterval": 1,
   "recurrenceMode": "HOUR"
@@ -53,9 +52,9 @@ Desativa a série e cancela suas pendências. Retorna a série e
 
 Lista apenas execuções `PENDING` ou `PROCESSING` de séries ativas.
 
-- `scheduledAt=YYYY-MM-DD` é opcional, mas exige `timezone` e filtra o dia
-  calendário nesse fuso.
-- `timezone=America/Sao_Paulo` é usado com o filtro de data.
+- `profileId=uuid` é obrigatório e restringe a consulta ao perfil.
+- `scheduledAt=YYYY-MM-DD` é opcional e filtra o dia calendário no fuso do
+  perfil.
 - `type=UNIQUE|RECURRENCE` é opcional e pode ser combinado com a data.
 
 ### `GET /events-m2m/guideline`
