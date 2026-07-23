@@ -70,10 +70,10 @@ export class AssistantMainService {
         lastMessages,
         tools: ASSISTANT_TOOLS,
       };
-
+      console.log('Workflow input:', JSON.stringify(workflowInput));
       const responseWorkflow =
         await this.assistantWorkflowService.fetch(workflowInput);
-
+      console.log('Response from workflow:', responseWorkflow);
       await this.messagesService.create({
         userId: profile.id,
         content: responseWorkflow.response,
