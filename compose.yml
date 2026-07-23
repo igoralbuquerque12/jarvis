@@ -11,12 +11,15 @@ services:
     restart: "no"
 
   server:
+    container_name: jarvis-server
     build:
       context: ./server
       target: production
     restart: unless-stopped
     env_file:
       - ./server/.env
+    ports:
+      - "3000:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
