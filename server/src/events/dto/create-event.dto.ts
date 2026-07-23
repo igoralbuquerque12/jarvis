@@ -22,10 +22,6 @@ export class CreateEventDto {
 
   @IsString()
   @IsNotEmpty()
-  timezone: string;
-
-  @IsString()
-  @IsNotEmpty()
   content: string;
 
   @ValidateIf((dto: CreateEventDto) => dto.type === EventSeriesType.RECURRENCE)
