@@ -28,9 +28,7 @@ export const EVENTS_TOOL: AssistantTool = {
         profileId:
           'Use sempre o profileId recebido no contexto do workflow; não peça este valor ao usuário.',
         type: 'UNIQUE para uma única execução ou RECURRENCE para uma rotina.',
-        startAt:
-          'Data e hora em ISO-8601. Quando não houver offset, informe também o timezone do usuário.',
-        timezone: 'Timezone IANA, por exemplo America/Sao_Paulo.',
+        startAt: 'Data e hora em ISO-8601.',
         content: 'Mensagem que deverá ser enviada no horário agendado.',
         recurrenceInterval:
           'Obrigatório somente para RECURRENCE: inteiro positivo que define o intervalo.',
@@ -59,10 +57,10 @@ export const EVENTS_TOOL: AssistantTool = {
       whenToUse:
         'Use quando o usuário pedir seus próximos eventos, eventos de um dia ou eventos por tipo.',
       request: {
+        profileId:
+          'Use sempre o profileId recebido no contexto do workflow; não peça este valor ao usuário.',
         scheduledAt:
-          'Opcional, no formato YYYY-MM-DD. Quando informado, timezone também é obrigatório.',
-        timezone:
-          'Timezone IANA usado para interpretar scheduledAt como um dia-calendário.',
+          'Opcional, no formato YYYY-MM-DD e interpretado no fuso do perfil.',
         type: 'Opcional: UNIQUE ou RECURRENCE.',
       },
       response:
