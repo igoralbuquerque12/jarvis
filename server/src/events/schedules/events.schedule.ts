@@ -86,7 +86,7 @@ export class EventsSchedule {
       execution.scheduledAt,
       eventSeries.recurrenceMode!,
       eventSeries.recurrenceInterval!,
-      eventSeries.timezone,
+      execution.eventSeries.profile.timezone,
     );
 
     try {
