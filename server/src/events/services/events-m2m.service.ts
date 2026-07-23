@@ -31,9 +31,9 @@ export class EventsM2mService {
 
     let scheduledAt: Date;
     try {
-      scheduledAt = parseAndNormalizeStartAt(data.startAt, data.timezone);
+      scheduledAt = parseAndNormalizeStartAt(data.startAt, profile.timezone);
     } catch {
-      throw new BadRequestException('startAt or timezone is invalid.');
+      throw new BadRequestException('startAt is invalid.');
     }
 
     const eventSeries = await this.eventSeriesService.create({
@@ -42,7 +42,6 @@ export class EventsM2mService {
       startAt: scheduledAt,
       recurrenceInterval: data.recurrenceInterval,
       recurrenceMode: data.recurrenceMode,
-      timezone: data.timezone,
       active: true,
     });
     const eventExecution = await this.eventExecutionService.create({
@@ -66,27 +65,29 @@ export class EventsM2mService {
   }
 
   async findActiveEvents(filters: FindActiveEventsDto) {
-    if (filters.scheduledAt && !filters.timezone) {
-      throw new BadRequestException(
-        'timezone is required when scheduledAt is provided.',
-      );
+    const profile = await this.profileService.findOne({
+      id: filters.profileId,
+    });
+    if (!profile) {
+      throw new NotFoundException(`Profile ${filters.profileId} not found`);
     }
 
     let scheduledAtStart: Date | undefined;
     let scheduledAtEnd: Date | undefined;
 
-    if (filters.scheduledAt && filters.timezone) {
+    if (filters.scheduledAt) {
       const start = DateTime.fromISO(`${filters.scheduledAt}T00:00:00`, {
-        zone: filters.timezone,
+        zone: profile.timezone,
       });
       if (!start.isValid) {
-        throw new BadRequestException('scheduledAt or timezone is invalid.');
+        throw new BadRequestException('scheduledAt is invalid.');
       }
       scheduledAtStart = start.toUTC().toJSDate();
       scheduledAtEnd = start.plus({ days: 1 }).toUTC().toJSDate();
     }
 
     return this.eventExecutionService.findActive({
+      profileId: filters.profileId,
       type: filters.type,
       scheduledAtStart,
       scheduledAtEnd,
