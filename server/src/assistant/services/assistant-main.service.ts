@@ -8,6 +8,7 @@ import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import { AssistantWorkflowService } from './assistant-workflow.service';
 import { WhatsappSenderService } from '../../whatsapp/whatsapp-sender.service';
 import { AssistantConnectionService } from './assistant-connection.service';
+import { ASSISTANT_TOOLS } from '../tools/main.tools';
 
 @Injectable()
 export class AssistantMainService {
@@ -67,11 +68,12 @@ export class AssistantMainService {
         profileContext: profile.about,
         currentMessage: currentMessage,
         lastMessages,
+        tools: ASSISTANT_TOOLS,
       };
-
+      console.log('Workflow input:', JSON.stringify(workflowInput));
       const responseWorkflow =
         await this.assistantWorkflowService.fetch(workflowInput);
-
+      console.log('Response from workflow:', responseWorkflow);
       await this.messagesService.create({
         userId: profile.id,
         content: responseWorkflow.response,

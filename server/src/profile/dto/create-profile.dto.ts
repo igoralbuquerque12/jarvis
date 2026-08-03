@@ -28,6 +28,11 @@ export class CreateProfileDto {
   about?: string;
 
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  timezone?: string;
+
+  @IsOptional()
   @IsBoolean()
   active?: boolean;
 
