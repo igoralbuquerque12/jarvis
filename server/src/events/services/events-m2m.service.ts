@@ -6,6 +6,11 @@ import {
 import { EventSeriesType } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { ProfileService } from '../../profile/profile.service';
+import { RedisService } from '../../redis/redis.service';
+import {
+  EVENTS_SCHEDULE_CACHE_KEY,
+  EVENTS_SCHEDULE_CACHE_WINDOW_MS,
+} from '../constants/events-cache.constant';
 import { CreateEventDto } from '../dto/create-event.dto';
 import { FindActiveEventsDto } from '../dto/find-active-events.dto';
 import { getEventsGuideline } from '../utils/get-events-guideline';
@@ -19,6 +24,7 @@ export class EventsM2mService {
     private readonly eventSeriesService: EventSeriesService,
     private readonly eventExecutionService: EventExecutionService,
     private readonly profileService: ProfileService,
+    private readonly redisService: RedisService,
   ) {}
 
   async createEvent(data: CreateEventDto) {
@@ -49,6 +55,10 @@ export class EventsM2mService {
       scheduledAt,
       content: data.content,
     });
+
+    if (scheduledAt.getTime() - Date.now() < EVENTS_SCHEDULE_CACHE_WINDOW_MS) {
+      await this.redisService.getClient().del(EVENTS_SCHEDULE_CACHE_KEY);
+    }
 
     return { eventSeries, eventExecution };
   }

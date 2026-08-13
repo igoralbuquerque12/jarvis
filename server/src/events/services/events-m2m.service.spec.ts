@@ -10,10 +10,13 @@ describe('EventsM2mService', () => {
     cancelPendingBySeriesId: jest.fn(),
     findActive: jest.fn(),
   };
+  const redisClient = { del: jest.fn() };
+  const redis = { getClient: jest.fn(() => redisClient) };
   const service = new EventsM2mService(
     series as never,
     executions as never,
     profile as never,
+    redis as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -99,6 +102,48 @@ describe('EventsM2mService', () => {
       scheduledAtStart: new Date('2026-07-25T03:00:00.000Z'),
       scheduledAtEnd: new Date('2026-07-26T03:00:00.000Z'),
     });
+  });
+
+  it('clears the schedule cache when the event fires within the next 2h', async () => {
+    profile.findOne.mockResolvedValue({
+      id: 'profile-id',
+      timezone: 'UTC',
+    });
+    series.create.mockResolvedValue({ id: 'series-id' });
+    executions.create.mockResolvedValue({ id: 'execution-id' });
+
+    const startAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    await service.createEvent({
+      profileId: 'profile-id',
+      type: EventSeriesType.UNIQUE,
+      startAt,
+      content: 'Enviar relatório',
+    });
+
+    expect(redisClient.del).toHaveBeenCalledWith(
+      'events:schedule:pending-cache',
+    );
+  });
+
+  it('keeps the schedule cache when the event fires after the next 2h', async () => {
+    profile.findOne.mockResolvedValue({
+      id: 'profile-id',
+      timezone: 'UTC',
+    });
+    series.create.mockResolvedValue({ id: 'series-id' });
+    executions.create.mockResolvedValue({ id: 'execution-id' });
+
+    const startAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+
+    await service.createEvent({
+      profileId: 'profile-id',
+      type: EventSeriesType.UNIQUE,
+      startAt,
+      content: 'Enviar relatório',
+    });
+
+    expect(redisClient.del).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown profile', async () => {

@@ -1,10 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventExecutionStatus, EventSeriesType, Prisma } from '@prisma/client';
+import { RedisService } from '../../redis/redis.service';
 import { WhatsappSenderService } from '../../whatsapp/whatsapp-sender.service';
+import {
+  EVENTS_SCHEDULE_CACHE_KEY,
+  EVENTS_SCHEDULE_CACHE_TTL_SECONDS,
+  EVENTS_SCHEDULE_CACHE_WINDOW_MS,
+} from '../constants/events-cache.constant';
 import { EventExecutionService } from '../services/event-execution.service';
 import { EventSeriesService } from '../services/event-series.service';
 import { getNextScheduledAt } from '../utils/get-next-scheduled-at';
+
+type CachedEvent = { id: string; scheduledAt: string };
 
 @Injectable()
 export class EventsSchedule {
@@ -14,13 +22,30 @@ export class EventsSchedule {
     private readonly eventExecutionService: EventExecutionService,
     private readonly eventSeriesService: EventSeriesService,
     private readonly whatsappSenderService: WhatsappSenderService,
+    private readonly redisService: RedisService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async processDueEvents() {
-    const executions = await this.eventExecutionService.findPendingDue(
-      new Date(),
-    );
+    const now = new Date();
+    const cached = await this.getOrPopulateCache(now);
+
+    const due = cached.filter((event) => new Date(event.scheduledAt) <= now);
+    if (due.length === 0) {
+      return;
+    }
+
+    const pending = cached.filter((event) => new Date(event.scheduledAt) > now);
+    await this.redisService
+      .getClient()
+      .set(EVENTS_SCHEDULE_CACHE_KEY, JSON.stringify(pending), {
+        expiration: 'KEEPTTL',
+      });
+
+    const executions =
+      await this.eventExecutionService.findManyByIdsForProcessing(
+        due.map((event) => event.id),
+      );
     const marked = await this.eventExecutionService.markAsProcessing(
       executions.map((execution) => execution.id),
     );
@@ -32,6 +57,29 @@ export class EventsSchedule {
     for (const execution of executions) {
       await this.processExecution(execution);
     }
+  }
+
+  private async getOrPopulateCache(now: Date): Promise<CachedEvent[]> {
+    const client = this.redisService.getClient();
+    const raw = await client.get(EVENTS_SCHEDULE_CACHE_KEY);
+
+    if (raw !== null) {
+      return JSON.parse(raw) as CachedEvent[];
+    }
+
+    const windowEnd = new Date(now.getTime() + EVENTS_SCHEDULE_CACHE_WINDOW_MS);
+    const executions =
+      await this.eventExecutionService.findPendingIdsInWindow(windowEnd);
+    const cached: CachedEvent[] = executions.map((execution) => ({
+      id: execution.id,
+      scheduledAt: execution.scheduledAt.toISOString(),
+    }));
+
+    await client.set(EVENTS_SCHEDULE_CACHE_KEY, JSON.stringify(cached), {
+      expiration: { type: 'EX', value: EVENTS_SCHEDULE_CACHE_TTL_SECONDS },
+    });
+
+    return cached;
   }
 
   private async processExecution(
