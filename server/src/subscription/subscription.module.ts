@@ -1,7 +1,11 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
 
 @Module({
+  imports: [forwardRef(() => AuthModule)],
+  controllers: [SubscriptionController],
   providers: [SubscriptionService],
   exports: [SubscriptionService],
 })
