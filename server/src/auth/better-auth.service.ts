@@ -27,8 +27,9 @@ export class BetterAuthService {
         autoSignIn: true,
         disableSignUp: false,
         minPasswordLength: 8,
-        sendResetPassword: async ({ user, url }) => {
-          await this.logAuthLink('password-reset', user.email, url);
+        sendResetPassword: ({ user, url }) => {
+          this.logAuthLink('password-reset', user.email, url);
+          return Promise.resolve();
         },
       },
       socialProviders: this.createSocialProviders(),
@@ -105,7 +106,7 @@ export class BetterAuthService {
     return process.env.BETTER_AUTH_SECRET?.trim();
   }
 
-  private async logAuthLink(kind: string, email: string, url: string) {
+  private logAuthLink(kind: string, email: string, url: string) {
     this.logger.log(`Prepared ${kind} link for ${email}: ${url}`);
   }
 }
