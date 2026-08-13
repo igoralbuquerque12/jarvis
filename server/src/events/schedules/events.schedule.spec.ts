@@ -7,17 +7,21 @@ import { EventsSchedule } from './events.schedule';
 
 describe('EventsSchedule', () => {
   const executions = {
-    findPendingDue: jest.fn(),
+    findPendingIdsInWindow: jest.fn(),
+    findManyByIdsForProcessing: jest.fn(),
     markAsProcessing: jest.fn(),
     update: jest.fn(),
     create: jest.fn(),
   };
   const series = { findOne: jest.fn(), update: jest.fn() };
   const whatsapp = { sendMessage: jest.fn() };
+  const redisClient = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+  const redis = { getClient: jest.fn(() => redisClient) };
   const schedule = new EventsSchedule(
     executions as never,
     series as never,
     whatsapp as never,
+    redis as never,
   );
 
   const recurringExecution = {
@@ -32,7 +36,14 @@ describe('EventsSchedule', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    executions.findPendingDue.mockResolvedValue([recurringExecution]);
+    redisClient.get.mockResolvedValue(null);
+    redisClient.set.mockResolvedValue('OK');
+    executions.findPendingIdsInWindow.mockResolvedValue([
+      { id: 'execution-id', scheduledAt: recurringExecution.scheduledAt },
+    ]);
+    executions.findManyByIdsForProcessing.mockResolvedValue([
+      recurringExecution,
+    ]);
     executions.markAsProcessing.mockResolvedValue({ count: 1 });
     executions.update.mockResolvedValue({});
     executions.create.mockResolvedValue({});
@@ -92,5 +103,47 @@ describe('EventsSchedule', () => {
 
     expect(series.update).toHaveBeenCalledWith('series-id', { active: false });
     expect(executions.create).not.toHaveBeenCalled();
+  });
+
+  it('uses the redis cache instead of the database while it has not expired', async () => {
+    redisClient.get.mockResolvedValue(
+      JSON.stringify([
+        { id: 'execution-id', scheduledAt: recurringExecution.scheduledAt },
+      ]),
+    );
+
+    await schedule.processDueEvents();
+
+    expect(executions.findPendingIdsInWindow).not.toHaveBeenCalled();
+    expect(executions.findManyByIdsForProcessing).toHaveBeenCalledWith([
+      'execution-id',
+    ]);
+  });
+
+  it('does not query the database when the cache has no due events yet', async () => {
+    redisClient.get.mockResolvedValue(
+      JSON.stringify([
+        { id: 'execution-id', scheduledAt: '2999-01-01T00:00:00Z' },
+      ]),
+    );
+
+    await schedule.processDueEvents();
+
+    expect(executions.findPendingIdsInWindow).not.toHaveBeenCalled();
+    expect(executions.findManyByIdsForProcessing).not.toHaveBeenCalled();
+    expect(executions.markAsProcessing).not.toHaveBeenCalled();
+  });
+
+  it('repopulates the cache from the database when it has expired', async () => {
+    redisClient.get.mockResolvedValue(null);
+
+    await schedule.processDueEvents();
+
+    expect(executions.findPendingIdsInWindow).toHaveBeenCalledTimes(1);
+    expect(redisClient.set).toHaveBeenCalledWith(
+      'events:schedule:pending-cache',
+      expect.any(String),
+      { expiration: { type: 'EX', value: 7200 } },
+    );
   });
 });
