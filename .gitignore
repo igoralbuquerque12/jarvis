@@ -2,3 +2,6 @@ vibe-git/
 .env
 
 ui ux/
+
+images/
+.agents/
