@@ -12,7 +12,9 @@ export class SubscriptionService {
   }
 
   findAll() {
-    return this.prisma.subscription.findMany();
+    return this.prisma.subscription.findMany({
+      orderBy: { price: 'asc' },
+    });
   }
 
   async findOne(id: string) {
