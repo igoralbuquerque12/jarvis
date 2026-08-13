@@ -1,3 +1,24 @@
-import type { CreateProfileDto } from './create-profile.dto';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsTimeZone,
+  MaxLength,
+} from 'class-validator';
 
-export type UpdateProfileDto = Omit<Partial<CreateProfileDto>, 'userId'>;
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  about?: string;
+
+  @IsOptional()
+  @IsTimeZone()
+  timezone?: string;
+}
