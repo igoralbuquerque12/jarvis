@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ProfileAuthUser } from './entities/profile-auth-user';
+import { ProfileWithSubscription } from './entities/profile-me.view';
 import { generateToken } from './utils/generate-token';
 
 @Injectable()
@@ -73,12 +75,15 @@ export class ProfileService {
     });
   }
 
-  async update(id: string, data: UpdateProfileDto) {
+  async update(id: string, data: Prisma.ProfileUpdateInput) {
     await this.findOne({ id });
     return this.prisma.profile.update({ where: { id }, data });
   }
 
-  async updateByUserId(userId: string, data: UpdateProfileDto) {
+  async updateByUserId(
+    userId: string,
+    data: UpdateProfileDto,
+  ): Promise<ProfileWithSubscription> {
     const profile = await this.findOne({ userId });
 
     if (!profile) {
@@ -88,7 +93,21 @@ export class ProfileService {
     return this.prisma.profile.update({
       where: { userId },
       data,
+      include: { subscription: true },
     });
+  }
+
+  async findMeByUserId(userId: string): Promise<ProfileWithSubscription> {
+    const profile = await this.prisma.profile.findUnique({
+      where: { userId },
+      include: { subscription: true },
+    });
+
+    if (!profile) {
+      throw new NotFoundException(`Profile for user ${userId} not found`);
+    }
+
+    return profile;
   }
 
   async remove(id: string) {
