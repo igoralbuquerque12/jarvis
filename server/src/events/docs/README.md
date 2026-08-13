@@ -61,9 +61,43 @@ Lista apenas execuções `PENDING` ou `PROCESSING` de séries ativas.
 
 Retorna uma diretriz textual básica para a IA estruturar requisições de evento.
 
+## Endpoints autenticados (web)
+
+Diferente dos `/events-m2m/*` (protegidos apenas pela rede interna), estes
+endpoints exigem sessão do better-auth (cookie) e operam sempre sobre o perfil
+do usuário logado — o `profileId` nunca vem do cliente.
+
+### `GET /events/me`
+
+Lista execuções `PENDING` ou `PROCESSING` de séries ativas do perfil da sessão,
+ordenadas por `scheduledAt`. Cada item traz `id`, `content`, `scheduledAt`,
+`status` e `series` (`id`, `type`, `recurrenceInterval`, `recurrenceMode`).
+
+### `DELETE /events/me/series/:seriesId`
+
+Desativa a série e cancela suas pendências, somente se a série pertencer ao
+perfil da sessão (caso contrário responde `404`, sem revelar existência).
+Retorna `{ "cancelledExecutions": n }`.
+
 ## Scheduler
 
-`EventsSchedule` roda a cada 10 minutos. Ele busca pendências vencidas de
-séries ativas, reserva-as como `PROCESSING`, envia o conteúdo para o `jid` do
-perfil, persiste `COMPLETED` ou `FAILED` e registra falhas em `observabilitys`.
+`EventsSchedule` roda a cada 10 minutos. A cada execução, ele consulta um
+cache no Redis (chave `events:schedule:pending-cache`, TTL de 2h) contendo
+`{ id, scheduledAt }` das execuções `PENDING` de séries ativas dentro da
+próxima janela de 2h:
+
+- Se o cache não existe (expirou ou nunca foi criado), consulta o banco,
+  monta a lista e grava no Redis com TTL de 2h.
+- Se o cache existe, usa a lista do Redis em vez de consultar o banco —
+  mesmo que nenhum item esteja vencido ainda, ou que os vencidos já tenham
+  sido processados. O banco só é consultado de novo quando o TTL expirar.
+- Itens vencidos são removidos do cache (mantendo o TTL original) e seus
+  dados completos são buscados no banco pelo `id` para processamento:
+  reserva como `PROCESSING`, envia o conteúdo para o `jid` do perfil,
+  persiste `COMPLETED` ou `FAILED` e registra falhas em `observabilitys`.
+
+Ao criar um evento (`POST /events-m2m/events`) cujo `startAt` cai dentro das
+próximas 2h, o cache é invalidado (`DEL`) imediatamente, forçando a próxima
+execução da schedule a reconsultar o banco e incluir o novo evento na janela.
+
 Não há retentativa automática nesta versão.
