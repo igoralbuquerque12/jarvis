@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Patch, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { BetterAuthService } from '../auth/better-auth.service';
-import type { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { toProfileMeView } from './entities/profile-me.view';
 import { ProfileService } from './profile.service';
 
 @Controller('profile')
@@ -14,9 +15,10 @@ export class ProfileController {
   @Get('me')
   async getCurrentProfile(@Req() request: Request) {
     const session = await this.authService.requireSession(request.headers);
-    const profile = await this.profileService.ensureAuthProfile(session.user);
+    await this.profileService.ensureAuthProfile(session.user);
+    const profile = await this.profileService.findMeByUserId(session.user.id);
 
-    return profile;
+    return toProfileMeView(profile);
   }
 
   @Patch('me')
@@ -26,7 +28,11 @@ export class ProfileController {
   ) {
     const session = await this.authService.requireSession(request.headers);
     await this.profileService.ensureAuthProfile(session.user);
+    const profile = await this.profileService.updateByUserId(
+      session.user.id,
+      data,
+    );
 
-    return this.profileService.updateByUserId(session.user.id, data);
+    return toProfileMeView(profile);
   }
 }
