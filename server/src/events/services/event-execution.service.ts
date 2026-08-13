@@ -42,11 +42,31 @@ export class EventExecutionService {
     return this.prisma.eventExecution.delete({ where: { id } });
   }
 
-  findPendingDue(now: Date) {
+  findPendingIdsInWindow(windowEnd: Date) {
     return this.prisma.eventExecution.findMany({
       where: {
         status: EventExecutionStatus.PENDING,
-        scheduledAt: { lte: now },
+        scheduledAt: { lte: windowEnd },
+        eventSeries: { active: true },
+      },
+      select: { id: true, scheduledAt: true },
+      orderBy: { scheduledAt: 'asc' },
+    });
+  }
+
+  findManyByIdsForProcessing(ids: string[]): Promise<
+    Prisma.EventExecutionGetPayload<{
+      include: { eventSeries: { include: { profile: true } } };
+    }>[]
+  > {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.prisma.eventExecution.findMany({
+      where: {
+        id: { in: ids },
+        status: EventExecutionStatus.PENDING,
         eventSeries: { active: true },
       },
       include: {
