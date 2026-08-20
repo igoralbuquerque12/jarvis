@@ -1,3 +1,11 @@
+x-securo-env: &securo-env
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@securo-db:5432/securo
+  SECRET_KEY: ${SECURO_SECRET_KEY:-dev-secret-change-in-production}
+  DEBUG: "false"
+  FRONTEND_URL: http://localhost:8000
+  REDIS_URL: redis://redis:6379/1
+  STORAGE_LOCAL_PATH: /app/data/attachments
+
 services:
   migrate:
     build:
@@ -20,10 +28,89 @@ services:
       - ./server/.env
     environment:
       REDIS_URL: redis://redis:6379
+      SECURO_API_URL: http://securo-backend:8000
     ports:
       - "3000:3000"
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      securo-backend:
+        condition: service_started
+    networks:
+      - jarvis-internal
+
+  securo-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: securo
+    volumes:
+      - securo-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jarvis-internal
+
+  securo-migrate:
+    build: ./securo/backend
+    environment: *securo-env
+    command: alembic upgrade head
+    depends_on:
+      securo-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - jarvis-internal
+    restart: "no"
+
+  securo-backend:
+    container_name: jarvis-securo
+    build: ./securo/backend
+    restart: unless-stopped
+    environment: *securo-env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - securo-attachments:/app/data/attachments
+    depends_on:
+      securo-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - jarvis-internal
+
+  securo-celery-worker:
+    build: ./securo/backend
+    restart: unless-stopped
+    environment: *securo-env
+    command: celery -A app.worker worker --loglevel=info --concurrency=2
+    volumes:
+      - securo-attachments:/app/data/attachments
+    depends_on:
+      securo-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - jarvis-internal
+
+  securo-celery-beat:
+    build: ./securo/backend
+    restart: unless-stopped
+    environment: *securo-env
+    command: celery -A app.worker beat --loglevel=info
+    depends_on:
+      securo-migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -50,3 +137,5 @@ networks:
 
 volumes:
   redis-data:
+  securo-pgdata:
+  securo-attachments:
