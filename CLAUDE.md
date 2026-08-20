@@ -77,7 +77,11 @@ A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile
 
 `PrismaService` extends `PrismaClient` using the `@prisma/adapter-pg` driver adapter (required for the Neon pooler). Baileys session credentials are stored in the `whatsapp_auth` table, **AES-encrypted** by `WhatsappAuthCryptoService` with `WHATSAPP_AUTH_ENCRYPTION_KEY`. Losing that key means re-scanning the QR.
 
-`RedisModule` is `@Global()` and connects on boot (`REDIS_URL`, injected by compose), but `RedisService` currently has no consumers — it's scaffolding.
+`RedisModule` is `@Global()` and connects on boot (`REDIS_URL`, injected by compose). Consumers: the events schedule cache and the finance module's Securo token cache.
+
+### Finance (Securo)
+
+`securo/` vendors the Securo open-source finance manager (FastAPI + Postgres + Celery); the root compose runs its backend, migrations, and celery worker/beat on `jarvis-internal` (DB in the `securo-pgdata` volume, Redis shared with Jarvis on database 1, port published only on `127.0.0.1:8000`). `server/src/finance/` proxies it per profile: every `Profile` gets its own Securo user, provisioned in background on signup (better-auth hook) and lazily self-healed on first use. Credentials are deterministic (`HMAC(SECURO_PROVISION_SECRET, profileId)` — never stored); JWTs are cached in Redis for 23h. User creation goes through Securo's admin API (`SECURO_ADMIN_*` env vars; the admin itself is bootstrapped via `/api/setup/create-admin` on first boot). Two facades expose the same operations: `/finance-m2m/:profileId/*` for n8n tools and `/finance/me/*` for the web (session). Amounts are always positive with direction in `type` (`debit`/`credit`), money is sent as 2-decimal strings, dates are `YYYY-MM-DD`, and Securo's unvalidated enums are enforced in the DTOs (`securo-vocab.constant.ts`). `FINANCE.md` (pt-BR, repo root) is the detailed doc — keep it in sync with behavior changes.
 
 ## Conventions
 
