@@ -3,6 +3,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { betterAuth } from 'better-auth/minimal';
 import { fromNodeHeaders } from 'better-auth/node';
+import { SecuroProvisioningService } from '../finance/services/securo-provisioning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProfileService } from '../profile/profile.service';
 
@@ -14,6 +15,7 @@ export class BetterAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly profileService: ProfileService,
+    private readonly securoProvisioningService: SecuroProvisioningService,
   ) {
     this.auth = betterAuth({
       baseURL: this.getAuthBaseURL(),
@@ -43,7 +45,8 @@ export class BetterAuthService {
         user: {
           create: {
             after: async (user) => {
-              await this.profileService.ensureAuthProfile(user);
+              const profile = await this.profileService.ensureAuthProfile(user);
+              this.securoProvisioningService.provisionInBackground(profile);
             },
           },
         },

@@ -2,6 +2,7 @@ import { Alert } from '../../components/ui/alert';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyEvents } from '../../hooks/use-my-events';
 import { useMyProfile } from '../../hooks/use-my-profile';
+import { FinanceSummaryCard } from '../finance/components/finance-summary-card';
 import { EventsCard } from './components/events-card';
 import { SubscriptionCard } from './components/subscription-card';
 import { WhatsappCard } from './components/whatsapp-card';
@@ -53,6 +54,7 @@ export function DashboardPage() {
         />
         <div className="dash-grid__aside">
           <WhatsappCard profile={profile} />
+          <FinanceSummaryCard />
           <SubscriptionCard profile={profile} />
         </div>
       </div>

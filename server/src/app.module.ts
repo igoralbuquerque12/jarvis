@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
+import { FinanceModule } from './finance/finance.module';
 import { MessagesModule } from './messages/messages.module';
 import { ProfileModule } from './profile/profile.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -21,6 +22,7 @@ import { EventsModule } from './events/events.module';
     AuthModule,
     ProfileModule,
     SubscriptionModule,
+    FinanceModule,
     MessagesModule,
     WhatsappModule,
     EventsModule,

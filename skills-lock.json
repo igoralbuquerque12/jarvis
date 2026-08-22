@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "claude-design": {
+      "source": "jiji262/claude-design-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "f0fb7554ec060121d2e1c07115fe2d47d4740312b98164635bb874170dd75aae"
+    }
+  }
+}

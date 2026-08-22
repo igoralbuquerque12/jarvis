@@ -1,10 +1,11 @@
 import { forwardRef, Module } from '@nestjs/common';
 
 import { BetterAuthService } from './better-auth.service';
+import { FinanceModule } from '../finance/finance.module';
 import { ProfileModule } from '../profile/profile.module';
 
 @Module({
-  imports: [forwardRef(() => ProfileModule)],
+  imports: [forwardRef(() => ProfileModule), forwardRef(() => FinanceModule)],
   providers: [BetterAuthService],
   exports: [BetterAuthService],
 })

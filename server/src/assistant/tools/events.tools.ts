@@ -1,6 +1,6 @@
 export type AssistantToolEndpoint = {
   name: string;
-  method: 'POST' | 'DELETE' | 'GET';
+  method: 'POST' | 'DELETE' | 'GET' | 'PATCH';
   path: string;
   whenToUse: string;
   request: Record<string, string>;

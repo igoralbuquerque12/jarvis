@@ -90,6 +90,7 @@ model Profile {
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventSeries    EventSeries[]
+  securoAccount  SecuroAccount?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -159,6 +160,28 @@ model EventExecution {
   @@index([status, scheduledAt])
   @@index([eventSeriesId])
   @@map("event_executions")
+}
+
+model SecuroAccount {
+  id               String              @id @default(uuid()) @db.Uuid
+  profileId        String              @unique @db.Uuid
+  email            String              @unique
+  securoUserId     String?
+  workspaceId      String?
+  defaultAccountId String?
+  status           SecuroAccountStatus @default(PENDING)
+  observabilitys   String?
+  profile          Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@map("securo_accounts")
+}
+
+enum SecuroAccountStatus {
+  PENDING
+  ACTIVE
+  FAILED
 }
 
 enum EventSeriesType {
