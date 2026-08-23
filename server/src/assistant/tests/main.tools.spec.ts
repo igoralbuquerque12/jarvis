@@ -1,4 +1,4 @@
-import { ASSISTANT_TOOLS } from './main.tools';
+import { ASSISTANT_TOOLS } from '../tools/main.tools';
 
 describe('ASSISTANT_TOOLS', () => {
   it('publishes the events contracts without the guideline endpoint', () => {
