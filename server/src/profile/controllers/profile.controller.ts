@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Patch, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { BetterAuthService } from '../auth/better-auth.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { toProfileMeView } from './entities/profile-me.view';
-import { ProfileService } from './profile.service';
+import { BetterAuthService } from '../../auth/services/better-auth.service';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { toProfileMeView } from '../entities/profile-me.view';
+import { ProfileService } from '../services/profile.service';
 
 @Controller('profile')
 export class ProfileController {
