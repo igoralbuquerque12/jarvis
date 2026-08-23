@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { SendMessageDto } from './dto/send-message.dto';
-import { WhatsappService } from './whatsapp.service';
+import { SendMessageDto } from '../dto/send-message.dto';
+import { WhatsappService } from '../services/whatsapp.service';
 
 @Controller('whatsapp')
 export class WhatsappController {
