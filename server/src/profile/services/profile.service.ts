@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateProfileDto } from './dto/create-profile.dto';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { SubscriptionService } from '../subscription/subscription.service';
-import { ProfileAuthUser } from './entities/profile-auth-user';
-import { ProfileWithSubscription } from './entities/profile-me.view';
-import { generateToken } from './utils/generate-token';
+import { PrismaService } from '../../prisma/services/prisma.service';
+import { CreateProfileDto } from '../dto/create-profile.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { SubscriptionService } from '../../subscription/services/subscription.service';
+import { ProfileAuthUser } from '../entities/profile-auth-user';
+import { ProfileWithSubscription } from '../entities/profile-me.view';
+import { generateToken } from '../utils/generate-token';
 
 @Injectable()
 export class ProfileService {
