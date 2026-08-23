@@ -2,7 +2,7 @@ import { IsDefined, IsIn } from 'class-validator';
 import {
   SECURO_RULE_FIELDS,
   SECURO_RULE_OPS,
-} from '../constants/securo-vocab.constant';
+} from '../../core/constants/securo-vocab.constant';
 
 export class RuleConditionDto {
   @IsIn(SECURO_RULE_FIELDS)

@@ -1,5 +1,5 @@
 import { Allow, IsIn } from 'class-validator';
-import { SECURO_RULE_ACTION_OPS } from '../constants/securo-vocab.constant';
+import { SECURO_RULE_ACTION_OPS } from '../../core/constants/securo-vocab.constant';
 
 export class RuleActionDto {
   @IsIn(SECURO_RULE_ACTION_OPS)

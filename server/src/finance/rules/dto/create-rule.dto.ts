@@ -10,29 +10,26 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { SECURO_RULE_CONDITIONS_OPS } from '../constants/securo-vocab.constant';
+import { SECURO_RULE_CONDITIONS_OPS } from '../../core/constants/securo-vocab.constant';
 import { RuleActionDto } from './rule-action.dto';
 import { RuleConditionDto } from './rule-condition.dto';
 
-export class UpdateRuleDto {
-  @IsOptional()
+export class CreateRuleDto {
   @IsString()
   @IsNotEmpty()
-  name?: string;
+  name: string;
 
-  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => RuleConditionDto)
-  conditions?: RuleConditionDto[];
+  conditions: RuleConditionDto[];
 
-  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => RuleActionDto)
-  actions?: RuleActionDto[];
+  actions: RuleActionDto[];
 
   @IsOptional()
   @IsIn(SECURO_RULE_CONDITIONS_OPS)
@@ -45,4 +42,12 @@ export class UpdateRuleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  applyToExisting?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  overwriteExistingCategories?: boolean;
 }
