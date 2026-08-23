@@ -1,6 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 
-import { BetterAuthService } from './better-auth.service';
+import { BetterAuthService } from './services/better-auth.service';
 import { FinanceModule } from '../finance/finance.module';
 import { ProfileModule } from '../profile/profile.module';
 
