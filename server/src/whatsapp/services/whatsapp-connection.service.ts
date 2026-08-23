@@ -13,7 +13,7 @@ import type {
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { setTimeout as delay } from 'node:timers/promises';
-import { BaileysAuthStore } from './auth/baileys-auth.store';
+import { BaileysAuthStore } from '../auth/baileys-auth.store';
 import { WhatsappReceiverService } from './whatsapp-receiver.service';
 
 type BaileysModule = typeof import('@whiskeysockets/baileys');
@@ -65,7 +65,6 @@ export class WhatsappConnectionService
   private async connect(): Promise<void> {
     if (this.connecting) return;
     this.connecting = true;
-
     try {
       await this.closeExistingSocket();
       const { state, saveCreds } =
