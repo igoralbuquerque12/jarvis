@@ -1,7 +1,7 @@
 import { Controller, Get, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { BetterAuthService } from '../auth/better-auth.service';
-import { SubscriptionService } from './subscription.service';
+import { BetterAuthService } from '../../auth/services/better-auth.service';
+import { SubscriptionService } from '../services/subscription.service';
 
 @Controller('subscriptions')
 export class SubscriptionController {
