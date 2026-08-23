@@ -16,7 +16,7 @@ import {
   ISO_DATE_PATTERN,
   SECURO_RECURRENCE_FREQUENCIES,
   SECURO_TRANSACTION_TYPES,
-} from '../constants/securo-vocab.constant';
+} from '../../core/constants/securo-vocab.constant';
 
 export class CreateRecurringTransactionDto {
   @IsString()
