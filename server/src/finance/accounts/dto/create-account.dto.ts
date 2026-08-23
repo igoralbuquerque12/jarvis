@@ -6,7 +6,7 @@ import {
   IsString,
   Length,
 } from 'class-validator';
-import { SECURO_ACCOUNT_TYPES } from '../constants/securo-vocab.constant';
+import { SECURO_ACCOUNT_TYPES } from '../../core/constants/securo-vocab.constant';
 
 export class CreateAccountDto {
   @IsString()
