@@ -11,7 +11,7 @@ import {
 import {
   ISO_DATE_PATTERN,
   SECURO_ASSET_TYPES,
-} from '../constants/securo-vocab.constant';
+} from '../../core/constants/securo-vocab.constant';
 
 export class CreateAssetDto {
   @IsString()

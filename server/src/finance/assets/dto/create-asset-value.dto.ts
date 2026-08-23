@@ -1,5 +1,5 @@
 import { IsNumber, Matches, Min } from 'class-validator';
-import { ISO_DATE_PATTERN } from '../constants/securo-vocab.constant';
+import { ISO_DATE_PATTERN } from '../../core/constants/securo-vocab.constant';
 
 export class CreateAssetValueDto {
   @IsNumber({ maxDecimalPlaces: 2 })

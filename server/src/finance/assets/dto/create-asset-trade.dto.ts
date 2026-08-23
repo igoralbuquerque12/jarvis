@@ -10,7 +10,7 @@ import {
 import {
   ISO_DATE_PATTERN,
   SECURO_ASSET_TRADE_KINDS,
-} from '../constants/securo-vocab.constant';
+} from '../../core/constants/securo-vocab.constant';
 
 export class CreateAssetTradeDto {
   @IsIn(SECURO_ASSET_TRADE_KINDS)
