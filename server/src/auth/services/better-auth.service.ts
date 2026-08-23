@@ -3,9 +3,9 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { betterAuth } from 'better-auth/minimal';
 import { fromNodeHeaders } from 'better-auth/node';
-import { SecuroProvisioningService } from '../finance/services/securo-provisioning.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { ProfileService } from '../profile/profile.service';
+import { SecuroProvisioningService } from '../../finance/core/services/securo-provisioning.service';
+import { PrismaService } from '../../prisma/services/prisma.service';
+import { ProfileService } from '../../profile/services/profile.service';
 
 @Injectable()
 export class BetterAuthService {
