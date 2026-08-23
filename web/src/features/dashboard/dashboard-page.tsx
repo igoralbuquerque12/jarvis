@@ -3,6 +3,8 @@ import { Spinner } from '../../components/ui/spinner';
 import { useMyEvents } from '../../hooks/use-my-events';
 import { useMyProfile } from '../../hooks/use-my-profile';
 import { FinanceSummaryCard } from '../finance/components/finance-summary-card';
+import { DashChartCard } from './components/dash-chart-card';
+import { DashGoalsCard } from './components/dash-goals-card';
 import { EventsCard } from './components/events-card';
 import { SubscriptionCard } from './components/subscription-card';
 import { WhatsappCard } from './components/whatsapp-card';
@@ -38,8 +40,7 @@ export function DashboardPage() {
         <span className="eyebrow">Painel</span>
         <h2>Fala, {profile.name.split(' ')[0]}!</h2>
         <p>
-          Acompanhe seus próximos eventos e a conexão do Jarvis com o seu
-          WhatsApp.
+          Acompanhe seus próximos eventos, finanças e metas — tudo em um lugar.
         </p>
         <span className="sunset-bar" aria-hidden="true" />
       </div>
@@ -57,6 +58,11 @@ export function DashboardPage() {
           <FinanceSummaryCard />
           <SubscriptionCard profile={profile} />
         </div>
+      </div>
+
+      <div className="dash-bottom">
+        <DashChartCard />
+        <DashGoalsCard />
       </div>
     </>
   );
