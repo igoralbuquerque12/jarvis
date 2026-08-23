@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Profile, SecuroAccount, SecuroAccountStatus } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 
-import { PrismaService } from '../../prisma/prisma.service';
-import { RedisService } from '../../redis/redis.service';
+import { PrismaService } from '../../../prisma/services/prisma.service';
+import { RedisService } from '../../../redis/services/redis.service';
 import {
   SECURO_ADMIN_TOKEN_CACHE_KEY,
   SECURO_TOKEN_CACHE_TTL_SECONDS,
