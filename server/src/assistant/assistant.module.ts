@@ -8,7 +8,11 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { AssistantConnectionService } from './services/assistant-connection.service';
 
 @Module({
-  imports: [ProfileModule, MessagesModule, forwardRef(() => WhatsappModule)],
+  imports: [
+    forwardRef(() => ProfileModule),
+    MessagesModule,
+    forwardRef(() => WhatsappModule),
+  ],
   providers: [
     AssistantMainService,
     AssistantWorkflowService,

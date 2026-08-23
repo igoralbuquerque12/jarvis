@@ -18,28 +18,28 @@ services:
       - jarvis-internal
     restart: "no"
 
-  server:
-    container_name: jarvis-server
-    build:
-      context: ./server
-      target: production
-    restart: unless-stopped
-    env_file:
-      - ./server/.env
-    environment:
-      REDIS_URL: redis://redis:6379
-      SECURO_API_URL: http://securo-backend:8000
-    ports:
-      - "3000:3000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-      securo-backend:
-        condition: service_started
-    networks:
-      - jarvis-internal
+  # server:
+  #   container_name: jarvis-server
+  #   build:
+  #     context: ./server
+  #     target: production
+  #   restart: unless-stopped
+  #   env_file:
+  #     - ./server/.env
+  #   environment:
+  #     REDIS_URL: redis://redis:6379
+  #     SECURO_API_URL: http://securo-backend:8000
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     migrate:
+  #       condition: service_completed_successfully
+  #     redis:
+  #       condition: service_healthy
+  #     securo-backend:
+  #       condition: service_started
+  #   networks:
+  #     - jarvis-internal
 
   securo-db:
     image: pgvector/pgvector:pg16

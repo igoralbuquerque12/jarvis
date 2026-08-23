@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventExecutionStatus, EventSeriesType, Prisma } from '@prisma/client';
-import { RedisService } from '../../redis/redis.service';
-import { WhatsappSenderService } from '../../whatsapp/whatsapp-sender.service';
+import { RedisService } from '../../redis/services/redis.service';
+import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import {
   EVENTS_SCHEDULE_CACHE_KEY,
   EVENTS_SCHEDULE_CACHE_TTL_SECONDS,

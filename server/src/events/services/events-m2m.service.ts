@@ -5,8 +5,8 @@ import {
 } from '@nestjs/common';
 import { EventSeriesType } from '@prisma/client';
 import { DateTime } from 'luxon';
-import { ProfileService } from '../../profile/profile.service';
-import { RedisService } from '../../redis/redis.service';
+import { ProfileService } from '../../profile/services/profile.service';
+import { RedisService } from '../../redis/services/redis.service';
 import {
   EVENTS_SCHEDULE_CACHE_KEY,
   EVENTS_SCHEDULE_CACHE_WINDOW_MS,

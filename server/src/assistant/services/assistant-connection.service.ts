@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { ProfileService } from '../../profile/profile.service';
-import { WhatsappSenderService } from '../../whatsapp/whatsapp-sender.service';
+import { ProfileService } from '../../profile/services/profile.service';
+import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 
 @Injectable()
 export class AssistantConnectionService {

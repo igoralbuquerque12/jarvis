@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MessageType } from '@prisma/client/edge';
 
 import { IncomingMessageDto } from '../dto/receive-message.dto';
-import { ProfileService } from '../../profile/profile.service';
-import { MessagesService } from '../../messages/messages.service';
+import { ProfileService } from '../../profile/services/profile.service';
+import { MessagesService } from '../../messages/services/messages.service';
 import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import { AssistantWorkflowService } from './assistant-workflow.service';
-import { WhatsappSenderService } from '../../whatsapp/whatsapp-sender.service';
+import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import { AssistantConnectionService } from './assistant-connection.service';
 import { ASSISTANT_TOOLS } from '../tools/main.tools';
 

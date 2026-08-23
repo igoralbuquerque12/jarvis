@@ -2,7 +2,7 @@ import express from 'express';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { BetterAuthService } from './auth/better-auth.service';
+import { BetterAuthService } from './auth/services/better-auth.service';
 import { toNodeHandler } from 'better-auth/node';
 
 const logger = new Logger('Bootstrap');

@@ -7,8 +7,8 @@ import type {
   SignalDataTypeMap,
   proto,
 } from '@whiskeysockets/baileys';
-import { PrismaService } from '../../prisma/prisma.service';
-import { WhatsappAuthCryptoService } from '../crypto/whatsapp-auth-crypto.service';
+import { PrismaService } from '../../prisma/services/prisma.service';
+import { WhatsappAuthCryptoService } from '../services/whatsapp-auth-crypto.service';
 
 type BaileysModule = typeof import('@whiskeysockets/baileys');
 

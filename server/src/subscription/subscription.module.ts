@@ -1,7 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
-import { SubscriptionController } from './subscription.controller';
-import { SubscriptionService } from './subscription.service';
+import { SubscriptionController } from './controllers/subscription.controller';
+import { SubscriptionService } from './services/subscription.service';
 
 @Module({
   imports: [forwardRef(() => AuthModule)],
