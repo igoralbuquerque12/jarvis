@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ProfileModule } from '../profile/profile.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
@@ -10,7 +10,11 @@ import { EventSeriesService } from './services/event-series.service';
 import { EventsM2mService } from './services/events-m2m.service';
 
 @Module({
-  imports: [AuthModule, ProfileModule, WhatsappModule],
+  imports: [
+    forwardRef(() => AuthModule),
+    forwardRef(() => ProfileModule),
+    WhatsappModule,
+  ],
   controllers: [EventsController, EventsM2mController],
   providers: [
     EventSeriesService,

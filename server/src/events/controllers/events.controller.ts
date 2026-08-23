@@ -8,8 +8,8 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { BetterAuthService } from '../../auth/better-auth.service';
-import { ProfileService } from '../../profile/profile.service';
+import { BetterAuthService } from '../../auth/services/better-auth.service';
+import { ProfileService } from '../../profile/services/profile.service';
 import { EventExecutionService } from '../services/event-execution.service';
 import { EventSeriesService } from '../services/event-series.service';
 import { EventsM2mService } from '../services/events-m2m.service';
