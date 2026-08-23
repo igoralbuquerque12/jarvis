@@ -3,7 +3,7 @@ import {
   EventSeriesType,
   RecurrenceMode,
 } from '@prisma/client';
-import { EventsSchedule } from './events.schedule';
+import { EventsSchedule } from '../schedules/events.schedule';
 
 describe('EventsSchedule', () => {
   const executions = {
