@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { MessageUpsertType, WAMessage } from '@whiskeysockets/baileys';
-import { AssistantMainService } from '../assistant/services/assistant-main.service';
+import { AssistantMainService } from '../../assistant/services/assistant-main.service';
 
 @Injectable()
 export class WhatsappReceiverService {
