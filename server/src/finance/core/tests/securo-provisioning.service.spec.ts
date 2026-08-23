@@ -1,6 +1,6 @@
 import { SecuroAccountStatus } from '@prisma/client';
 
-import { SecuroProvisioningService } from './securo-provisioning.service';
+import { SecuroProvisioningService } from '../services/securo-provisioning.service';
 
 describe('SecuroProvisioningService', () => {
   const profile = { id: 'profile-1' };
