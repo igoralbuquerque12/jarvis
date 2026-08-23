@@ -2,7 +2,7 @@ import { RecurrenceMode } from '@prisma/client';
 import {
   getNextScheduledAt,
   normalizeScheduledAt,
-} from './get-next-scheduled-at';
+} from '../utils/get-next-scheduled-at';
 import { DateTime } from 'luxon';
 
 describe('event schedule date utilities', () => {
