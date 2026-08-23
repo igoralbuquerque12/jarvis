@@ -1,5 +1,5 @@
 import { IsIn, IsOptional } from 'class-validator';
-import { SECURO_GOAL_STATUSES } from '../constants/securo-vocab.constant';
+import { SECURO_GOAL_STATUSES } from '../../core/constants/securo-vocab.constant';
 
 export class FindGoalsDto {
   @IsOptional()

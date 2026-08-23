@@ -1,25 +1,30 @@
 import {
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
-  Length,
   Matches,
   MaxLength,
   Min,
 } from 'class-validator';
-import { ISO_DATE_PATTERN } from '../constants/securo-vocab.constant';
+import {
+  ISO_DATE_PATTERN,
+  SECURO_GOAL_STATUSES,
+} from '../../core/constants/securo-vocab.constant';
 
-export class CreateGoalDto {
+export class UpdateGoalDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  name: string;
+  name?: string;
 
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
-  targetAmount: number;
+  targetAmount?: number;
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -27,19 +32,10 @@ export class CreateGoalDto {
   currentAmount?: number;
 
   @IsOptional()
-  @IsString()
-  @Length(3, 3)
-  currency?: string;
-
-  @IsOptional()
   @Matches(ISO_DATE_PATTERN)
   targetDate?: string;
 
   @IsOptional()
-  @IsString()
-  icon?: string;
-
-  @IsOptional()
-  @Matches(/^#[0-9A-Fa-f]{6}$/)
-  color?: string;
+  @IsIn(SECURO_GOAL_STATUSES)
+  status?: (typeof SECURO_GOAL_STATUSES)[number];
 }
