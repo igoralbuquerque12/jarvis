@@ -1,31 +1,37 @@
-import { Type } from 'class-transformer';
 import {
   IsIn,
-  IsInt,
+  IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   IsUUID,
   Matches,
-  Max,
-  Min,
+  MaxLength,
 } from 'class-validator';
 import {
   ISO_DATE_PATTERN,
   SECURO_TRANSACTION_TYPES,
-} from '../constants/securo-vocab.constant';
+} from '../../core/constants/securo-vocab.constant';
 
-export class FindTransactionsDto {
+export class UpdateTransactionDto {
   @IsOptional()
-  @Matches(ISO_DATE_PATTERN)
-  from?: string;
+  @IsString()
+  @IsNotEmpty()
+  description?: string;
 
   @IsOptional()
-  @Matches(ISO_DATE_PATTERN)
-  to?: string;
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount?: number;
 
   @IsOptional()
   @IsIn(SECURO_TRANSACTION_TYPES)
   type?: (typeof SECURO_TRANSACTION_TYPES)[number];
+
+  @IsOptional()
+  @Matches(ISO_DATE_PATTERN)
+  date?: string;
 
   @IsOptional()
   @IsUUID()
@@ -37,18 +43,6 @@ export class FindTransactionsDto {
 
   @IsOptional()
   @IsString()
-  q?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  limit?: number;
+  @MaxLength(1000)
+  notes?: string;
 }
