@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EventSeriesType } from '@prisma/client';
-import { EventsM2mService } from './events-m2m.service';
+import { EventsM2mService } from '../services/events-m2m.service';
 
 describe('EventsM2mService', () => {
   const profile = { findOne: jest.fn() };
