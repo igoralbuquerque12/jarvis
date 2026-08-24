@@ -1,5 +1,7 @@
 const rawApiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:3000';
+  import.meta.env.VITE_API_BASE_URL?.trim() ||
+  import.meta.env.VITE_API_URL?.trim() ||
+  'http://localhost:3000';
 
 export const apiBaseUrl = rawApiBaseUrl.replace(/\/$/, '');
 

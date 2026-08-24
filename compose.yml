@@ -18,28 +18,62 @@ services:
       - jarvis-internal
     restart: "no"
 
-  # server:
-  #   container_name: jarvis-server
-  #   build:
-  #     context: ./server
-  #     target: production
-  #   restart: unless-stopped
-  #   env_file:
-  #     - ./server/.env
-  #   environment:
-  #     REDIS_URL: redis://redis:6379
-  #     SECURO_API_URL: http://securo-backend:8000
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     migrate:
-  #       condition: service_completed_successfully
-  #     redis:
-  #       condition: service_healthy
-  #     securo-backend:
-  #       condition: service_started
-  #   networks:
-  #     - jarvis-internal
+  server:
+    container_name: jarvis-server
+    build:
+      context: ./server
+      target: production
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      securo-backend:
+        condition: service_started
+    env_file:
+      - ./server/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      SECURO_API_URL: http://securo-backend:8000
+      CORS_ORIGIN: https://${FRONTEND_DOMAIN:-localhost}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.jarvis-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.jarvis-api.entrypoints=websecure
+      - traefik.http.routers.jarvis-api.tls=true
+      - traefik.http.routers.jarvis-api.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.jarvis-api.loadbalancer.server.port=3000
+    networks:
+      - jarvis-internal
+      - proxy
+
+  web:
+    container_name: jarvis-web
+    build:
+      context: ./web
+      target: production
+      args:
+        VITE_API_URL: https://${API_DOMAIN}
+        VITE_API_BASE_URL: https://${API_DOMAIN}
+        VITE_WHATSAPP_NUMBER: ${VITE_WHATSAPP_NUMBER:-}
+    restart: unless-stopped
+    depends_on:
+      - server
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.jarvis-web.rule=Host(`${FRONTEND_DOMAIN}`)
+      - traefik.http.routers.jarvis-web.entrypoints=websecure
+      - traefik.http.routers.jarvis-web.tls=true
+      - traefik.http.routers.jarvis-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.jarvis-web.loadbalancer.server.port=80
+    networks:
+      - jarvis-internal
+      - proxy
 
   securo-db:
     image: pgvector/pgvector:pg16
@@ -77,8 +111,6 @@ services:
     restart: unless-stopped
     environment: *securo-env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-    ports:
-      - "127.0.0.1:8000:8000"
     volumes:
       - securo-attachments:/app/data/attachments
     depends_on:
@@ -134,6 +166,9 @@ services:
 networks:
   jarvis-internal:
     name: jarvis-internal
+  proxy:
+    external: true
+    name: proxy
 
 volumes:
   redis-data:
