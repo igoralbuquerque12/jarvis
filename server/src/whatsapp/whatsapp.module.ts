@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { BaileysAuthStore } from './auth/baileys-auth.store';
 import { WhatsappAuthCryptoService } from './services/whatsapp-auth-crypto.service';
 import { WhatsappController } from './controllers/whatsapp.controller';
+import { WhatsappAdminGuard } from './guards/whatsapp-admin.guard';
 import { WhatsappConnectionService } from './services/whatsapp-connection.service';
 import { WhatsappReceiverService } from './services/whatsapp-receiver.service';
 import { WhatsappSenderService } from './services/whatsapp-sender.service';
@@ -18,7 +19,8 @@ import { AssistantModule } from '../assistant/assistant.module';
     WhatsappConnectionService,
     WhatsappSenderService,
     WhatsappService,
+    WhatsappAdminGuard,
   ],
-  exports: [WhatsappService, WhatsappSenderService],
+  exports: [WhatsappService, WhatsappSenderService, WhatsappAdminGuard],
 })
 export class WhatsappModule {}
