@@ -38,7 +38,8 @@ services:
       PORT: 3000
       REDIS_URL: redis://redis:6379
       SECURO_API_URL: http://securo-backend:8000
-      CORS_ORIGIN: https://${FRONTEND_DOMAIN:-localhost}
+      WEB_ORIGIN: https://${FRONTEND_DOMAIN}
+      BETTER_AUTH_URL: https://${API_DOMAIN}
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
@@ -58,7 +59,6 @@ services:
       target: production
       args:
         VITE_API_URL: https://${API_DOMAIN}
-        VITE_API_BASE_URL: https://${API_DOMAIN}
         VITE_WHATSAPP_NUMBER: ${VITE_WHATSAPP_NUMBER:-}
     restart: unless-stopped
     depends_on:
