@@ -16,55 +16,26 @@ export type AssistantTool = {
 export const EVENTS_TOOL: AssistantTool = {
   module: 'events',
   description:
-    'Cria, remove e consulta mensagens agendadas do perfil atual. Eventos podem ser únicos ou recorrentes.',
+    'Gerencia as rotinas, lembretes e agendamentos de mensagens do perfil. Tudo é concentrado em uma única rota RPC.',
   endpoints: [
     {
-      name: 'create_event',
+      name: 'execute_events_operation',
       method: 'POST',
-      path: '/events-m2m/events',
+      path: '/events-m2m/:profileId/execute',
       whenToUse:
-        'Use quando o usuário pedir para criar um lembrete, envio agendado ou rotina recorrente.',
+        'Sempre que o usuário quiser criar, excluir ou consultar eventos ou rotinas.',
       request: {
         profileId:
-          'Use sempre o profileId recebido no contexto do workflow; não peça este valor ao usuário.',
-        type: 'UNIQUE para uma única execução ou RECURRENCE para uma rotina.',
-        startAt: 'Data e hora em ISO-8601.',
-        content: 'Mensagem que deverá ser enviada no horário agendado.',
-        recurrenceInterval:
-          'Obrigatório somente para RECURRENCE: inteiro positivo que define o intervalo.',
-        recurrenceMode:
-          'Obrigatório somente para RECURRENCE: HOUR, DAY, WEEK ou MONTH.',
+          'Obrigatório: profileId extraído do contexto no parâmetro de rota.',
+        operation: 'Obrigatório: Nome da operação.',
+        data:
+          'Objeto de dados dependendo da operação. Operações suportadas:\n' +
+          '- create_event: { type ("UNIQUE" ou "RECURRENCE"), startAt, content, recurrenceInterval, recurrenceMode }\n' +
+          '- delete_event: { eventSeriesId }\n' +
+          '- find_active_events: { scheduledAt (opcional), type (opcional) }\n' +
+          '- get_guideline: {} (sem parâmetros adicionais)',
       },
-      response:
-        'Retorna { eventSeries, eventExecution }. A primeira execução inicia com status PENDING.',
-    },
-    {
-      name: 'delete_event',
-      method: 'DELETE',
-      path: '/events-m2m/events/:eventSeriesId',
-      whenToUse:
-        'Use quando o usuário pedir para cancelar ou remover um evento agendado.',
-      request: {
-        eventSeriesId: 'Identificador da série de evento que será cancelada.',
-      },
-      response:
-        'Retorna { eventSeries, cancelledExecutions }. A série fica inativa e pendências passam para CANCELLED.',
-    },
-    {
-      name: 'list_active_events',
-      method: 'GET',
-      path: '/events-m2m/events',
-      whenToUse:
-        'Use quando o usuário pedir seus próximos eventos, eventos de um dia ou eventos por tipo.',
-      request: {
-        profileId:
-          'Use sempre o profileId recebido no contexto do workflow; não peça este valor ao usuário.',
-        scheduledAt:
-          'Opcional, no formato YYYY-MM-DD e interpretado no fuso do perfil.',
-        type: 'Opcional: UNIQUE ou RECURRENCE.',
-      },
-      response:
-        'Retorna execuções PENDING ou PROCESSING de séries ativas, ordenadas por scheduledAt e com resumo da série.',
+      response: 'Retorna o resultado da respectiva operação.',
     },
   ],
 };
