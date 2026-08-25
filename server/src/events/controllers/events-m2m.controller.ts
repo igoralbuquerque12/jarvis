@@ -1,37 +1,54 @@
 import {
+  BadRequestException,
   Body,
   Controller,
-  Delete,
-  Get,
   Param,
+  ParseUUIDPipe,
   Post,
-  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { CreateEventDto } from '../dto/create-event.dto';
-import { FindActiveEventsDto } from '../dto/find-active-events.dto';
+
+import { WhatsappAdminGuard } from '../../whatsapp/guards/whatsapp-admin.guard';
+import { ExecuteOperationDto } from '../../core/dto/execute-operation.dto';
+
 import { EventsM2mService } from '../services/events-m2m.service';
 
+import { CreateEventDto } from '../dto/create-event.dto';
+import { FindActiveEventsDto } from '../dto/find-active-events.dto';
+
+import { validateDto } from '../../core/utils/validate-dto.util';
+
+@UseGuards(WhatsappAdminGuard)
 @Controller('events-m2m')
 export class EventsM2mController {
   constructor(private readonly eventsM2mService: EventsM2mService) {}
 
-  @Post('events')
-  createEvent(@Body() data: CreateEventDto) {
-    return this.eventsM2mService.createEvent(data);
-  }
+  @Post(':profileId/execute')
+  async execute(
+    @Param('profileId', ParseUUIDPipe) profileId: string,
+    @Body() body: ExecuteOperationDto,
+  ) {
+    const { operation, data } = body;
 
-  @Delete('events/:eventSeriesId')
-  deleteEvent(@Param('eventSeriesId') eventSeriesId: string) {
-    return this.eventsM2mService.deleteEvent(eventSeriesId);
-  }
+    const dataWithProfile = { ...data, profileId };
 
-  @Get('events')
-  findActiveEvents(@Query() filters: FindActiveEventsDto) {
-    return this.eventsM2mService.findActiveEvents(filters);
-  }
-
-  @Get('guideline')
-  getGuideline() {
-    return this.eventsM2mService.getGuideline();
+    switch (operation) {
+      case 'create_event': {
+        const dto = await validateDto(CreateEventDto, dataWithProfile);
+        return this.eventsM2mService.createEvent(dto);
+      }
+      case 'delete_event': {
+        return this.eventsM2mService.deleteEvent(data.eventSeriesId as string);
+      }
+      case 'find_active_events': {
+        const dto = await validateDto(FindActiveEventsDto, dataWithProfile);
+        return this.eventsM2mService.findActiveEvents(dto);
+      }
+      case 'get_guideline': {
+        return this.eventsM2mService.getGuideline();
+      }
+      default:
+        throw new BadRequestException('Operação não suportada');
+    }
   }
 }
