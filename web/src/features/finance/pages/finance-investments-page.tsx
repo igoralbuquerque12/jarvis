@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { Alert } from '../../../components/ui/alert';
+import { Button } from '../../../components/ui/button';
+import { Card } from '../../../components/ui/card';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { IconBriefcase, IconPlus } from '../../../components/ui/icons';
+import { Modal, ModalActions } from '../../../components/ui/modal';
+import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
+import { Stat } from '../../../components/ui/stat';
 import { useMyAssets } from '../../../hooks/use-my-assets';
 import {
   createMyAsset,
   deleteMyAsset,
 } from '../../../services/finance.service';
+import { ASSET_TYPE_OPTIONS } from '../asset-types';
 import { Amount } from '../components/amount';
 import { AssetRow } from '../components/asset-row';
 
-const ASSET_TYPES = [
-  { value: 'stock', label: 'Ação' },
-  { value: 'crypto', label: 'Cripto' },
-  { value: 'real_estate', label: 'Imóvel' },
-  { value: 'fixed_income', label: 'Renda Fixa' },
-  { value: 'other', label: 'Outro' },
-];
-
-function CreateAssetForm({
+function AssetForm({
   onCreated,
   onClose,
 }: {
@@ -32,164 +32,263 @@ function CreateAssetForm({
   const [currentValue, setCurrentValue] = useState('');
   const [purchaseDate, setPurchaseDate] = useState('');
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const number = (value: string) =>
+    value ? parseFloat(value.replace(',', '.')) : undefined;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setSaving(true);
-    setErr(null);
+    setFormError(null);
     try {
       await createMyAsset({
-        name,
+        name: name.trim(),
         type,
-        ticker: ticker || undefined,
-        units: units ? parseFloat(units) : undefined,
-        purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
-        currentValue: currentValue ? parseFloat(currentValue) : undefined,
+        ticker: ticker.trim() || undefined,
+        units: number(units),
+        purchasePrice: number(purchasePrice),
+        currentValue: number(currentValue),
         purchaseDate: purchaseDate || undefined,
       });
       onCreated();
       onClose();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Erro ao criar ativo.');
+    } catch (error: unknown) {
+      setFormError(error instanceof Error ? error.message : 'Erro ao criar ativo.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
-      <div className="card__header">
-        <h3 className="card__title">Novo Ativo</h3>
-        <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>Cancelar</button>
-      </div>
-      <form onSubmit={(e) => void handleSubmit(e)}>
+    <Modal title="Novo ativo" onClose={onClose}>
+      <form className="form" onSubmit={(event) => void handleSubmit(event)}>
         <div className="field">
-          <label className="label" htmlFor="asset-name">Nome</label>
-          <input id="asset-name" className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ex: PETR4, Bitcoin, Apartamento" />
+          <label className="label" htmlFor="asset-name">
+            Nome
+          </label>
+          <input
+            id="asset-name"
+            className="input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+            placeholder="Ex.: Petrobras, Bitcoin, Tesouro Selic"
+            autoFocus
+          />
         </div>
-        <div className="field">
-          <label className="label" htmlFor="asset-type">Tipo</label>
-          <select id="asset-type" className="select" value={type} onChange={(e) => setType(e.target.value)}>
-            {ASSET_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+        <div className="field-row">
+          <div className="field">
+            <label className="label" htmlFor="asset-type">
+              Tipo
+            </label>
+            <select
+              id="asset-type"
+              className="select"
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+            >
+              {ASSET_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="asset-ticker">
+              Código
+            </label>
+            <input
+              id="asset-ticker"
+              className="input"
+              value={ticker}
+              onChange={(event) => setTicker(event.target.value.toUpperCase())}
+              placeholder="Ex.: PETR4"
+            />
+          </div>
         </div>
-        <div className="field">
-          <label className="label" htmlFor="asset-ticker">Ticker (opcional)</label>
-          <input id="asset-ticker" className="input" value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="Ex: PETR4" />
+        <div className="field-row">
+          <div className="field">
+            <label className="label" htmlFor="asset-units">
+              Quantidade
+            </label>
+            <input
+              id="asset-units"
+              className="input"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              value={units}
+              onChange={(event) => setUnits(event.target.value)}
+              placeholder="Ex.: 100"
+            />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="asset-buy-price">
+              Preço de compra (R$)
+            </label>
+            <input
+              id="asset-buy-price"
+              className="input"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              value={purchasePrice}
+              onChange={(event) => setPurchasePrice(event.target.value)}
+              placeholder="Por unidade"
+            />
+          </div>
         </div>
-        <div className="field">
-          <label className="label" htmlFor="asset-units">Quantidade</label>
-          <input id="asset-units" className="input" type="number" step="any" min="0" value={units} onChange={(e) => setUnits(e.target.value)} placeholder="Ex: 100" />
+        <div className="field-row">
+          <div className="field">
+            <label className="label" htmlFor="asset-curr-val">
+              Valor atual (R$)
+            </label>
+            <input
+              id="asset-curr-val"
+              className="input"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={currentValue}
+              onChange={(event) => setCurrentValue(event.target.value)}
+              placeholder="Total da posição"
+            />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="asset-date">
+              Data de compra
+            </label>
+            <input
+              id="asset-date"
+              className="input"
+              type="date"
+              value={purchaseDate}
+              onChange={(event) => setPurchaseDate(event.target.value)}
+            />
+          </div>
         </div>
-        <div className="field">
-          <label className="label" htmlFor="asset-buy-price">Preço de compra (R$)</label>
-          <input id="asset-buy-price" className="input" type="number" step="0.000001" min="0" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="asset-curr-val">Valor atual (R$)</label>
-          <input id="asset-curr-val" className="input" type="number" step="0.01" min="0" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="asset-date">Data de compra</label>
-          <input id="asset-date" className="input" type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-        </div>
-        {err && <div className="alert alert--error" style={{ marginTop: 12 }}>{err}</div>}
-        <div style={{ marginTop: 20 }}>
-          <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Criando…' : 'Adicionar ativo'}</button>
-        </div>
+        {formError ? <Alert variant="error">{formError}</Alert> : null}
+        <ModalActions>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Criando…' : 'Adicionar ativo'}
+          </Button>
+        </ModalActions>
       </form>
-    </div>
+    </Modal>
   );
 }
 
 export function FinanceInvestmentsPage() {
   const { assets, loading, error, reload } = useMyAssets();
-  const [showForm, setShowForm] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   async function handleDelete(id: string) {
-    if (!confirm('Remover este ativo? Esta ação não pode ser desfeita.')) return;
+    if (!window.confirm('Remover este ativo? Esta ação não pode ser desfeita.')) {
+      return;
+    }
     await deleteMyAsset(id);
     reload();
   }
 
-  const totalValue = assets.reduce((sum, a) => sum + (a.currentValue ?? 0), 0);
-  const totalCost = assets.reduce((sum, a) => sum + (a.totalCost ?? 0), 0);
+  const totalValue = assets.reduce((sum, asset) => sum + (asset.currentValue ?? 0), 0);
+  const totalCost = assets.reduce((sum, asset) => sum + (asset.totalCost ?? 0), 0);
   const totalGain = totalValue - totalCost;
+  const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
 
   return (
     <>
-      <div className="page-head">
-        <span className="eyebrow">Investimentos</span>
-        <h2>Portfólio</h2>
-        <p>Acompanhe seus ativos e o desempenho da carteira.</p>
-        <span className="sunset-bar" aria-hidden="true" />
+      <PageHeader
+        eyebrow="Finanças"
+        title="Investimentos"
+        description="Sua carteira: ações, cripto, renda fixa e imóveis."
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <IconPlus />
+            Novo ativo
+          </Button>
+        }
+      />
+
+      <div className="stats stats--3">
+        <Stat
+          label="Valor da carteira"
+          tone="accent"
+          value={<Amount value={totalValue} />}
+          foot={`${assets.length} ${assets.length === 1 ? 'ativo' : 'ativos'}`}
+        />
+        <Stat label="Custo total" value={<Amount value={totalCost} />} foot="Quanto foi investido" />
+        <Stat
+          label="Resultado"
+          tone={totalGain >= 0 ? 'success' : 'danger'}
+          value={<Amount value={totalGain} colored />}
+          foot={
+            totalCost > 0
+              ? `${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}% sobre o custo`
+              : 'Informe custo e valor atual para ver o resultado'
+          }
+        />
       </div>
-
-      {/* Portfolio KPIs */}
-      {!loading && assets.length > 0 && (
-        <div className="fin-kpi-row" style={{ marginBottom: 24 }}>
-          <div className="fin-kpi">
-            <span className="fin-kpi__label">Valor total</span>
-            <Amount value={totalValue} className="fin-kpi__value" />
-          </div>
-          <div className="fin-kpi">
-            <span className="fin-kpi__label">Custo total</span>
-            <Amount value={totalCost} className="fin-kpi__value" />
-          </div>
-          <div className="fin-kpi">
-            <span className="fin-kpi__label">Ganho/Perda</span>
-            <Amount value={totalGain} colored className="fin-kpi__value" />
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button type="button" className="btn btn--primary" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? '× Cancelar' : '+ Novo ativo'}
-        </button>
-      </div>
-
-      {showForm && (
-        <CreateAssetForm onCreated={reload} onClose={() => setShowForm(false)} />
-      )}
 
       {loading ? (
         <Spinner page />
       ) : error ? (
         <Alert variant="error">{error}</Alert>
       ) : assets.length === 0 ? (
-        <div className="card">
-          <div className="event-empty">
-            <strong>Nenhum ativo cadastrado</strong>
-            <p>Adicione ações, cripto, renda fixa e outros investimentos.</p>
-          </div>
-        </div>
+        <Card>
+          <EmptyState
+            icon={<IconBriefcase />}
+            title="Nenhum ativo cadastrado"
+            action={
+              <Button variant="ghost" onClick={() => setCreating(true)}>
+                <IconPlus />
+                Adicionar o primeiro ativo
+              </Button>
+            }
+          >
+            Cadastre suas posições para acompanhar o valor da carteira e o
+            resultado ao longo do tempo.
+          </EmptyState>
+        </Card>
       ) : (
-        <div className="card" style={{ overflowX: 'auto' }}>
-          <table className="asset-table">
-            <thead>
-              <tr>
-                <th>Ativo</th>
-                <th>Tipo</th>
-                <th className="asset-table__num">Valor atual</th>
-                <th className="asset-table__num">Qtd.</th>
-                <th className="asset-table__num">Ganho/Perda</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map((a) => (
-                <AssetRow
-                  key={a.id}
-                  asset={a}
-                  onDelete={(id) => void handleDelete(id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card flush>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Ativo</th>
+                  <th>Tipo</th>
+                  <th className="table__num">Qtd.</th>
+                  <th className="table__num">Custo</th>
+                  <th className="table__num">Valor atual</th>
+                  <th className="table__num">Resultado</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {assets.map((asset) => (
+                  <AssetRow
+                    key={asset.id}
+                    asset={asset}
+                    onDelete={(id) => void handleDelete(id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
+
+      {creating ? (
+        <AssetForm onCreated={reload} onClose={() => setCreating(false)} />
+      ) : null}
     </>
   );
 }
