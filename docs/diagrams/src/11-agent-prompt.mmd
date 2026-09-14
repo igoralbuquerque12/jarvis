@@ -1,0 +1,33 @@
+flowchart LR
+  subgraph backend["Backend · calculado uma vez por processo"]
+    D1["DEFAULT_DIRECTIVE<br/>papel · instruções · raciocínio<br/>formato · exemplos"]
+    D2["renderToolsReference(ASSISTANT_TOOLS)<br/># Ferramentas disponíveis<br/>(gerado do catálogo tipado)"]
+    D1 --> DIR["directive"]
+    D2 --> DIR
+    CTX["por mensagem:<br/>profileId · about · histórico (10)<br/>now · nowHuman · timezone"]
+  end
+
+  subgraph n8n["n8n · workflow 'Jarvis assistant'"]
+    W["Webhook<br/>POST /webhook/assistant<br/>Header Auth (x-api-key)"] --> V["Validate input"]
+    V --> IF{"válido?"}
+    IF -- "não" --> RI["Respond invalid"]
+    IF -- "sim" --> BP["Build prompt<br/>directive<br/>+ &lt;data_e_hora_atual&gt;<br/>+ &lt;perfil_do_usuario&gt;<br/>+ &lt;historico_recente&gt; (escapa &lt; e &gt;)<br/>+ # Lembrete final"]
+    BP --> AG["AI Agent<br/>maxIterations = 8"]
+    AG <--> GM["Groq Chat Model<br/>gpt-oss-120b · temperature 0.2"]
+    AG <--> T1["tool create_event<br/>campos tipados via $fromAI"]
+    AG <--> T2["tool find_active_events"]
+    AG <--> T3["tool delete_event"]
+    AG <--> T4["tool finance<br/>operation + data (JSON string)<br/>27 operações"]
+    AG --> FR["Format response"]
+    FR --> RW["Respond to Webhook<br/>{ response }"]
+  end
+
+  DIR --> W
+  CTX --> W
+  T1 --> M1["Jarvis · /events-m2m/:profileId/execute"]
+  T2 --> M1
+  T3 --> M1
+  T4 --> M2["Jarvis · /finance-m2m/:profileId/execute"]
+
+  classDef ext fill:#fffdf8,stroke:#d9cbb2,color:#221b10;
+  class GM ext;

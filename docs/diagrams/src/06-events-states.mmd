@@ -1,0 +1,16 @@
+stateDiagram-v2
+  direction LR
+  [*] --> PENDING: create_event ou próxima ocorrência
+  PENDING --> PROCESSING: claim do scheduler (updateMany)
+  PENDING --> CANCELLED: delete_event desativa a série
+  PROCESSING --> COMPLETED: WhatsApp confirmou o envio
+  PROCESSING --> FAILED: erro no envio (observabilitys)
+  COMPLETED --> [*]
+  FAILED --> [*]
+  CANCELLED --> [*]
+  note right of PROCESSING
+    Sem retentativa automática.
+    A próxima ocorrência de uma série
+    RECURRENCE é criada depois de
+    COMPLETED ou FAILED.
+  end note

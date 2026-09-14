@@ -1,0 +1,80 @@
+erDiagram
+  USER ||--o| PROFILE : "1:1 via hook do better-auth"
+  USER ||--o{ ACCOUNT : "provedores (senha, Google)"
+  USER ||--o{ SESSION : "cookies"
+  SUBSCRIPTION ||--o{ PROFILE : "plano"
+  PROFILE ||--o{ EVENT_SERIES : "lembretes e rotinas"
+  EVENT_SERIES ||--o{ EVENT_EXECUTION : "disparos concretos"
+  PROFILE ||--o| SECURO_ACCOUNT : "usuario no Securo"
+  PROFILE ||--o{ API_KEY : "chaves jrv_"
+  PROFILE ||--o{ MESSAGE : "historico (userId = profile.id, sem FK)"
+
+  USER {
+    string id PK
+    string email UK
+    string name
+    boolean emailVerified
+  }
+  PROFILE {
+    uuid id PK
+    string userId FK "unique, nullable"
+    string name
+    string token UK "10 chars, pareamento"
+    string jid UK "e-mail ate parear"
+    string about "contexto para o prompt"
+    string timezone "IANA, default America/Sao_Paulo"
+    boolean active
+    uuid subscriptionId FK
+  }
+  SUBSCRIPTION {
+    uuid id PK
+    string name "Free Tier"
+    decimal price
+    int limit "mensagens por mes"
+  }
+  MESSAGE {
+    uuid id PK
+    string userId "index"
+    string content
+    enum type "user ou AI"
+    datetime createdAt
+  }
+  EVENT_SERIES {
+    uuid id PK
+    uuid profileId FK
+    enum type "UNIQUE ou RECURRENCE"
+    datetime startAt "UTC"
+    int recurrenceInterval "nullable"
+    enum recurrenceMode "HOUR DAY WEEK MONTH"
+    boolean active
+  }
+  EVENT_EXECUTION {
+    uuid id PK
+    uuid eventSeriesId FK
+    datetime scheduledAt "UTC, multiplo de 10 min"
+    string content
+    enum status "PENDING ate CANCELLED"
+    string observabilitys "motivo da falha"
+  }
+  SECURO_ACCOUNT {
+    uuid id PK
+    uuid profileId FK "unique"
+    string email UK
+    string securoUserId
+    string workspaceId
+    string defaultAccountId
+    enum status "PENDING ACTIVE FAILED"
+  }
+  API_KEY {
+    uuid id PK
+    uuid profileId FK
+    string name
+    string prefix "jrv_ + 8 chars"
+    string hash UK "SHA-256 do segredo"
+    boolean active
+    datetime lastUsedAt
+  }
+  WHATSAPP_AUTH {
+    string key PK "creds ou tipo:id"
+    json value "AES-256-GCM"
+  }

@@ -1,0 +1,35 @@
+flowchart LR
+  U(["Usuário"])
+  EXT(["Sistema externo do usuário<br/>script · CI · n8n · cron"])
+  WA["WhatsApp<br/>(app no celular)"]
+
+  subgraph jarvis["Jarvis (este repositório)"]
+    WEB["Web app<br/>React 19 + Vite<br/>painel, finanças, chaves de API"]
+    API["Core / API<br/>NestJS 11 + Prisma 7"]
+  end
+
+  subgraph ia["Camada de IA (fora do core)"]
+    N8N["n8n<br/>orquestrador do agente"]
+    LLM["LLM<br/>Groq · gpt-oss-120b"]
+  end
+
+  SEC["Securo<br/>motor financeiro<br/>FastAPI + Celery"]
+  PG[("PostgreSQL<br/>Neon")]
+  RD[("Redis 7")]
+
+  U -- "conversa em linguagem natural" --> WA
+  WA <-- "Baileys · WebSocket" --> API
+  U -- "login, painel" --> WEB
+  WEB -- "HTTPS + cookie de sessão" --> API
+  EXT -- "POST /v1/messages<br/>Bearer jrv_…" --> API
+  API -- "POST webhook<br/>prompt + catálogo de tools" --> N8N
+  N8N -- "tool calls<br/>/events-m2m · /finance-m2m" --> API
+  N8N <-- "function calling" --> LLM
+  API -- "HTTP interno<br/>JWT por perfil" --> SEC
+  API --> PG
+  API --> RD
+
+  classDef ext fill:#fffdf8,stroke:#d9cbb2,color:#221b10;
+  classDef data fill:#fff4e8,stroke:#d9cbb2,color:#221b10;
+  class WA,LLM,EXT ext;
+  class PG,RD data;

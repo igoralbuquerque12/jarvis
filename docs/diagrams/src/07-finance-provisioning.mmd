@@ -1,0 +1,28 @@
+flowchart TD
+  A(["operação financeira<br/>via /finance-m2m ou /finance/me"]) --> B["SecuroContextService.contextFor(profileId)"]
+  B --> C{"SecuroAccount ACTIVE<br/>com workspaceId e defaultAccountId?"}
+  C -- "sim" --> T
+  C -- "não (perfil novo, FAILED ou PENDING)" --> D["deriva credenciais determinísticas<br/>email = profile-{profileId}@jarvis.internal<br/>senha = HMAC-SHA256(SECURO_PROVISION_SECRET, profileId)"]
+  D --> E{"token admin no Redis?"}
+  E -- "não" --> F["GET /api/setup/status"]
+  F -- "instância vazia" --> G["POST /api/setup/create-admin<br/>(BRL, pt-BR)"]
+  F -- "já tem usuários" --> H["POST /api/auth/login (admin)"]
+  G --> I["cacheia token admin por 23h"]
+  H --> I
+  E -- "sim" --> J
+  I --> J["POST /api/admin/users<br/>sem rate limit · 'already exists' é tolerado"]
+  J --> K["login como o perfil → JWT (24h)"]
+  K --> L["GET /api/workspaces → 'Pessoal'"]
+  L --> M["GET/POST /api/accounts → 'Carteira' (BRL)"]
+  M --> N["SecuroAccount = ACTIVE<br/>ids gravados no Postgres do Jarvis"]
+  N --> T{"JWT do perfil no Redis?"}
+  T -- "sim" --> U["Authorization: Bearer + X-Workspace-Id"]
+  T -- "não" --> V["login → cacheia por 23h"]
+  V --> U
+  U --> W["chamada de domínio no Securo<br/>camelCase → snake_case · dinheiro '50.00' · datas YYYY-MM-DD"]
+  D -. "qualquer falha" .-> X["SecuroAccount = FAILED<br/>observabilitys = motivo<br/>reprovisiona na próxima operação"]
+
+  classDef io fill:#fffdf8,stroke:#d9cbb2,color:#221b10;
+  classDef bad fill:#fbe9e2,stroke:#c34a2b,color:#221b10;
+  class A io;
+  class X bad;

@@ -1,0 +1,50 @@
+flowchart TB
+  APP["AppModule"]
+  CFG["ConfigModule<br/>global"]
+  SCH["ScheduleModule"]
+  PR["PrismaModule<br/>global · adapter-pg"]
+  RD["RedisModule<br/>global"]
+  AUTH["AuthModule<br/>BetterAuthService"]
+  PROF["ProfileModule"]
+  SUB["SubscriptionModule"]
+  FIN["FinanceModule<br/>core + accounts, transactions,<br/>categories, rules, goals,<br/>recurring, assets"]
+  MSG["MessagesModule"]
+  WA["WhatsappModule<br/>connection · receiver · sender<br/>auth store · admin guard"]
+  AS["AssistantModule<br/>main · workflow · connection"]
+  EV["EventsModule<br/>m2m · web · schedule"]
+  AK["ApiKeysModule<br/>ApiKeyGuard"]
+  PUB["PublicApiModule<br/>/v1"]
+
+  APP --> CFG
+  APP --> SCH
+  APP --> PR
+  APP --> RD
+  APP --> AUTH
+  APP --> PROF
+  APP --> SUB
+  APP --> FIN
+  APP --> MSG
+  APP --> WA
+  APP --> AS
+  APP --> EV
+  APP --> AK
+  APP --> PUB
+
+  AUTH -. "forwardRef" .-> PROF
+  AUTH -. "forwardRef" .-> FIN
+  PROF -. "forwardRef" .-> AUTH
+  PROF --> SUB
+  WA -. "forwardRef" .-> AS
+  AS -. "forwardRef" .-> WA
+  AS --> PROF
+  AS --> MSG
+  EV --> WA
+  EV --> PROF
+  EV -. "forwardRef" .-> AUTH
+  FIN --> PROF
+  AK --> PROF
+  PUB --> AK
+  PUB --> WA
+
+  classDef infra fill:#fff4e8,stroke:#d9cbb2,color:#221b10;
+  class CFG,SCH,PR,RD infra;
