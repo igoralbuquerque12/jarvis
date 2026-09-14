@@ -1,13 +1,26 @@
+import { Link } from 'react-router-dom';
 import { Alert } from '../../components/ui/alert';
+import { IconPlus } from '../../components/ui/icons';
+import { PageHeader } from '../../components/ui/page-header';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyEvents } from '../../hooks/use-my-events';
 import { useMyProfile } from '../../hooks/use-my-profile';
-import { FinanceSummaryCard } from '../finance/components/finance-summary-card';
+import { timeOfDayGreeting } from '../../lib/dates';
 import { DashChartCard } from './components/dash-chart-card';
 import { DashGoalsCard } from './components/dash-goals-card';
+import { DashKpis } from './components/dash-kpis';
 import { EventsCard } from './components/events-card';
 import { SubscriptionCard } from './components/subscription-card';
 import { WhatsappCard } from './components/whatsapp-card';
+
+function todayLabel() {
+  const label = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date());
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 export function DashboardPage() {
   const {
@@ -34,36 +47,59 @@ export function DashboardPage() {
     );
   }
 
-  return (
-    <>
-      <div className="page-head">
-        <span className="eyebrow">Painel</span>
-        <h2>Fala, {profile.name.split(' ')[0]}!</h2>
-        <p>
-          Acompanhe seus próximos eventos, finanças e metas — tudo em um lugar.
-        </p>
-        <span className="sunset-bar" aria-hidden="true" />
-      </div>
+  const firstName = profile.name.split(' ')[0];
 
-      <div className="dash-grid">
-        <EventsCard
-          events={events}
-          loading={eventsLoading}
-          error={eventsError}
-          timezone={profile.timezone}
-          onChanged={reloadEvents}
-        />
-        <div className="dash-grid__aside">
+  return (
+    <div className="page">
+      <PageHeader
+        eyebrow={todayLabel()}
+        title={`${timeOfDayGreeting()}, ${firstName}`}
+        description="Seus lembretes, o mês financeiro e as metas em andamento."
+        actions={
+          <>
+            <Link
+              to={profile.whatsappLinked ? '/perfil' : '#conectar'}
+              className={
+                profile.whatsappLinked
+                  ? 'status-pill status-pill--on'
+                  : 'status-pill status-pill--off'
+              }
+            >
+              <span className="status-pill__dot" aria-hidden="true" />
+              {profile.whatsappLinked
+                ? 'WhatsApp conectado'
+                : 'WhatsApp pendente'}
+            </Link>
+            <Link
+              to="/financas/transacoes?nova=1"
+              className="btn btn--primary"
+            >
+              <IconPlus />
+              Nova transação
+            </Link>
+          </>
+        }
+      />
+
+      <DashKpis events={events} timezone={profile.timezone} />
+
+      <div className="cols">
+        <div className="stack">
+          <EventsCard
+            events={events}
+            loading={eventsLoading}
+            error={eventsError}
+            timezone={profile.timezone}
+            onChanged={reloadEvents}
+          />
+          <DashChartCard />
+        </div>
+        <div className="stack">
           <WhatsappCard profile={profile} />
-          <FinanceSummaryCard />
+          <DashGoalsCard />
           <SubscriptionCard profile={profile} />
         </div>
       </div>
-
-      <div className="dash-bottom">
-        <DashChartCard />
-        <DashGoalsCard />
-      </div>
-    </>
+    </div>
   );
 }
