@@ -1,60 +1,75 @@
+import { IconButton } from '../../../components/ui/button';
+import { IconPlus, IconTarget, IconTrash } from '../../../components/ui/icons';
+import { formatISODate } from '../../../lib/dates';
 import type { Goal } from '../../../types/api';
 import { Amount } from './amount';
 
 interface GoalCardProps {
   goal: Goal;
+  compact?: boolean;
   onDelete?: (id: string) => void;
   onUpdateAmount?: (goal: Goal) => void;
 }
 
-function formatDate(dateStr: string) {
-  const [year, month, day] = dateStr.split('-');
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(Number(year), Number(month) - 1, Number(day)));
-}
-
-export function GoalCard({ goal, onDelete, onUpdateAmount }: GoalCardProps) {
+export function GoalCard({
+  goal,
+  compact = false,
+  onDelete,
+  onUpdateAmount,
+}: GoalCardProps) {
   const progress = Math.min(
     Math.round((goal.currentAmount / goal.targetAmount) * 100),
     100,
   );
   const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0);
+  const done = remaining === 0;
+
+  const className = [
+    'goal-card',
+    compact ? 'goal-card--compact' : null,
+    done ? 'goal-card--done' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className="goal-card">
+    <div className={className}>
       <div className="goal-card__header">
-        {goal.icon && <span className="goal-card__icon">{goal.icon}</span>}
+        <span className="goal-card__icon" aria-hidden="true">
+          {goal.icon ? goal.icon : <IconTarget />}
+        </span>
         <div className="goal-card__info">
           <span className="goal-card__name">{goal.name}</span>
-          {goal.targetDate && (
-            <span className="goal-card__date muted">
-              até {formatDate(goal.targetDate)}
-            </span>
-          )}
+          <span className="goal-card__date muted">
+            {done
+              ? 'Concluída'
+              : goal.targetDate
+                ? `até ${formatISODate(goal.targetDate, { day: '2-digit', month: 'short', year: 'numeric' })}`
+                : 'Sem prazo'}
+          </span>
         </div>
-        <div className="goal-card__actions">
-          {onUpdateAmount && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => onUpdateAmount(goal)}
-            >
-              + Valor
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              className="btn btn--danger btn--sm"
-              onClick={() => onDelete(goal.id)}
-            >
-              ×
-            </button>
-          )}
-        </div>
+        {onUpdateAmount || onDelete ? (
+          <div className="goal-card__actions">
+            {onUpdateAmount ? (
+              <IconButton
+                label="Atualizar valor guardado"
+                outline
+                onClick={() => onUpdateAmount(goal)}
+              >
+                <IconPlus />
+              </IconButton>
+            ) : null}
+            {onDelete ? (
+              <IconButton
+                label="Excluir meta"
+                danger
+                onClick={() => onDelete(goal.id)}
+              >
+                <IconTrash />
+              </IconButton>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="goal-bar">
@@ -62,7 +77,7 @@ export function GoalCard({ goal, onDelete, onUpdateAmount }: GoalCardProps) {
           className="goal-bar__fill"
           style={{
             width: `${progress}%`,
-            backgroundColor: goal.color ?? 'var(--accent)',
+            backgroundColor: done ? undefined : goal.color,
           }}
         />
       </div>
@@ -76,11 +91,11 @@ export function GoalCard({ goal, onDelete, onUpdateAmount }: GoalCardProps) {
         <span className="goal-card__progress">{progress}%</span>
       </div>
 
-      {remaining > 0 && (
+      {!compact && remaining > 0 ? (
         <p className="goal-card__remaining muted">
           Faltam <Amount value={remaining} currency={goal.currency} />
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
