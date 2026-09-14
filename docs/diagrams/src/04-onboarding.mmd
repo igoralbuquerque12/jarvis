@@ -1,0 +1,27 @@
+sequenceDiagram
+  autonumber
+  participant U as Usuário
+  participant W as Web app
+  participant BA as better-auth (/api/auth)
+  participant P as ProfileService
+  participant SP as SecuroProvisioningService
+  participant SEC as Securo
+  participant WA as WhatsApp
+  participant AC as AssistantConnectionService
+
+  U->>W: cadastro (e-mail + senha ou Google)
+  W->>BA: POST /api/auth/sign-up
+  BA->>BA: cria User + Session (cookie)
+  BA->>P: hook user.create.after → ensureAuthProfile
+  P->>P: Profile { token 10 chars, jid = e-mail (placeholder), plano Free Tier }
+  BA-)SP: provisionInBackground(profile) · fire-and-forget
+  SP->>SEC: token admin (create-admin no 1º boot ou login)
+  SP->>SEC: POST /api/admin/users · senha = HMAC(secret, profileId)
+  SP->>SEC: login do perfil → workspace "Pessoal" → conta "Carteira"
+  SP->>SP: SecuroAccount = ACTIVE · JWT no Redis por 23h
+  W-->>U: painel mostra o token e o botão "Abrir no WhatsApp"
+  U->>WA: "Oi Jarvis! Este é o meu token de conexão: AB12CD34EF"
+  WA->>AC: mensagem vinda de um jid sem perfil
+  AC->>P: findOne({ token })
+  AC->>P: update(profile, { jid: 5511…@s.whatsapp.net })
+  AC-->>WA: "Oi, Igor! Sua conta foi conectada com sucesso."

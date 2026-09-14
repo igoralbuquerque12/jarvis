@@ -10,6 +10,8 @@ import { RedisModule } from './redis/redis.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { EventsModule } from './events/events.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { PublicApiModule } from './public-api/public-api.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { EventsModule } from './events/events.module';
     MessagesModule,
     WhatsappModule,
     EventsModule,
+    ApiKeysModule,
+    PublicApiModule,
   ],
   controllers: [],
   providers: [],

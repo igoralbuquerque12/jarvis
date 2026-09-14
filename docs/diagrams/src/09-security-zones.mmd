@@ -1,0 +1,31 @@
+flowchart LR
+  WEB(["Web app<br/>navegador"])
+  EXT(["Sistemas externos"])
+  N8N(["n8n"])
+
+  subgraph pub["Zona pública · via Traefik (HTTPS)"]
+    S1["/api/auth/*<br/>better-auth montado fora do Nest<br/>cookie de sessão"]
+    S2["/profile/me · /events/me<br/>/finance/me/* · /api-keys/me*<br/>requireSession(headers)<br/>profileId nunca vem do cliente"]
+    S3["/v1/*<br/>ApiKeyGuard<br/>Bearer jrv_… → SHA-256 → Profile dono"]
+  end
+
+  subgraph priv["Zona interna · rede jarvis-internal, sem porta no host"]
+    M1["/events-m2m/:profileId/execute<br/>/finance-m2m/:profileId/execute<br/>/whatsapp/qr · /status · /send<br/>WhatsappAdminGuard<br/>chave estática + timingSafeEqual"]
+    SEC["Securo API :8000<br/>JWT por perfil + X-Workspace-Id<br/>isolamento por workspace"]
+  end
+
+  subgraph secrets["Segredos em repouso"]
+    K1["Credenciais Baileys<br/>AES-256-GCM<br/>WHATSAPP_AUTH_ENCRYPTION_KEY"]
+    K2["Senhas do Securo<br/>nunca armazenadas:<br/>HMAC-SHA256(secret, profileId)"]
+    K3["API keys<br/>só hash SHA-256 + prefixo<br/>segredo exibido uma vez"]
+  end
+
+  WEB --> S1
+  WEB --> S2
+  EXT --> S3
+  N8N --> M1
+  M1 --> SEC
+  S2 --> SEC
+
+  classDef sec fill:#fff4e8,stroke:#d9cbb2,color:#221b10;
+  class K1,K2,K3 sec;

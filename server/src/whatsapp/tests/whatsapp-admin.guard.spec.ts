@@ -7,7 +7,9 @@ import { WhatsappController } from '../controllers/whatsapp.controller';
 describe('WhatsappAdminGuard', () => {
   const secretKey = 'super-secret-admin-key-123';
 
-  function createMockContext(headers: Record<string, string | undefined>): ExecutionContext {
+  function createMockContext(
+    headers: Record<string, string | undefined>,
+  ): ExecutionContext {
     return {
       switchToHttp: () => ({
         getRequest: () => ({ headers }),

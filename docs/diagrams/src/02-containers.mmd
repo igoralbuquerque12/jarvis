@@ -1,0 +1,52 @@
+flowchart TB
+  INET(("Internet"))
+
+  subgraph vps["VPS · Docker Compose"]
+    direction TB
+    subgraph proxy["rede proxy (externa)"]
+      TR["Traefik<br/>TLS via Let's Encrypt"]
+    end
+    subgraph internal["rede jarvis-internal · nenhuma porta publicada no host"]
+      direction TB
+      WEB["jarvis-web<br/>nginx servindo o build Vite<br/>:80"]
+      SRV["jarvis-server<br/>NestJS · :3000"]
+      MIG["migrate<br/>prisma migrate deploy<br/>one-shot"]
+      RDS[("redis<br/>AOF · volume redis-data<br/>db0 Jarvis · db1 Securo")]
+      N8N["n8n<br/>container à parte,<br/>conectado à rede<br/>:5678"]
+      SB["jarvis-securo<br/>FastAPI · :8000"]
+      SW["securo-celery-worker"]
+      SBT["securo-celery-beat<br/>recorrências a cada hora"]
+      SM["securo-migrate<br/>alembic upgrade head<br/>one-shot"]
+      SDB[("securo-db<br/>Postgres 16 + pgvector<br/>volume securo-pgdata")]
+    end
+  end
+
+  NEON[("Neon PostgreSQL<br/>pooler · sslmode=require")]
+  WAS["Servidores do WhatsApp"]
+  GROQ["Groq API"]
+
+  INET --> TR
+  TR -- "FRONTEND_DOMAIN" --> WEB
+  TR -- "API_DOMAIN" --> SRV
+  MIG -. "exit 0 antes de subir" .-> SRV
+  RDS -. "healthy antes de subir" .-> SRV
+  SM -. "exit 0 antes de subir" .-> SB
+  SRV <--> RDS
+  SRV -- "SECURO_API_URL" --> SB
+  SRV -- "ASSISTANT_WORKFLOW_URL" --> N8N
+  N8N -- "http://server:3000" --> SRV
+  N8N --> GROQ
+  SB --> SDB
+  SW --> SDB
+  SBT --> SDB
+  SB <--> RDS
+  SW <--> RDS
+  SRV -- "DATABASE_URL" --> NEON
+  SRV <-- "Baileys" --> WAS
+
+  classDef ext fill:#fffdf8,stroke:#d9cbb2,color:#221b10;
+  classDef data fill:#fff4e8,stroke:#d9cbb2,color:#221b10;
+  classDef oneshot fill:#fffdf8,stroke:#f4690f,stroke-dasharray: 5 4,color:#221b10;
+  class WAS,GROQ,INET ext;
+  class NEON,RDS,SDB data;
+  class MIG,SM oneshot;

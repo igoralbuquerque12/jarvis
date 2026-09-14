@@ -1,0 +1,30 @@
+flowchart TD
+  T(["@Cron a cada 10 minutos"]) --> C{"cache no Redis?<br/>events:schedule:pending-cache"}
+  C -- "não (expirou ou foi invalidado)" --> Q["SELECT execuções PENDING de séries ativas<br/>com scheduledAt ≤ agora + 2h"]
+  Q --> W["grava lista { id, scheduledAt }<br/>TTL 2h"]
+  W --> F
+  C -- "sim" --> F["filtra vencidos: scheduledAt ≤ agora"]
+  F --> Z{"há vencidos?"}
+  Z -- "não" --> FIM(["fim do tick"])
+  Z -- "sim" --> P["reescreve o cache só com os futuros<br/>(KEEPTTL)"]
+  P --> L["carrega execuções por id<br/>+ série + perfil (jid, timezone)"]
+  L --> M["updateMany PENDING → PROCESSING<br/>claim atômico em lote"]
+  M --> E["para cada execução"]
+  E --> S["WhatsappSender.sendMessage(jid, content)"]
+  S -- "ok" --> OK["status = COMPLETED"]
+  S -- "erro" --> KO["status = FAILED<br/>motivo em observabilitys"]
+  OK --> N
+  KO --> N{"tipo da série?"}
+  N -- "UNIQUE" --> D["série.active = false"]
+  N -- "RECURRENCE" --> G["getNextScheduledAt<br/>Luxon no fuso do perfil,<br/>avança até ser futuro,<br/>arredonda para 10 min"]
+  G --> I["INSERT próxima execução<br/>@@unique(seriesId, scheduledAt)<br/>P2002 → ignorado (dedupe)"]
+  D --> FIM
+  I --> FIM
+
+  X(["create_event via M2M"]) --> Y{"startAt cai nas próximas 2h?"}
+  Y -- "sim" --> DEL["DEL do cache"]
+  DEL -.-> C
+  Y -- "não" --> FIM2(["entra na próxima repopulação"])
+
+  classDef io fill:#fffdf8,stroke:#d9cbb2,color:#221b10;
+  class T,FIM,X,FIM2 io;

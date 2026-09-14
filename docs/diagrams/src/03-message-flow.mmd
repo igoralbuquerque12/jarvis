@@ -1,0 +1,41 @@
+sequenceDiagram
+  autonumber
+  participant U as Usuário (WhatsApp)
+  participant B as Baileys socket
+  participant R as WhatsappReceiverService
+  participant A as AssistantMainService
+  participant DB as PostgreSQL (Prisma)
+  participant N as n8n · AI Agent
+  participant L as LLM (Groq)
+  participant M as Endpoints M2M
+  participant S as WhatsappSenderService
+
+  U->>B: mensagem de texto
+  B->>R: messages.upsert (type = notify)
+  R->>R: ignora fromMe, sem texto e histórico (append)
+  R->>A: receiveMessage({ from: jid, text })
+  A->>DB: Profile.findUnique({ jid })
+  alt jid desconhecido
+    A->>A: procura um token de 10 caracteres na mensagem
+    A->>DB: Profile.findFirst({ token }) e grava o jid
+    A->>S: "sua conta foi conectada" (ou silêncio)
+  else perfil encontrado
+    A->>DB: últimas 10 mensagens (histórico)
+    A->>DB: persiste a mensagem atual (type = user)
+    A->>N: POST webhook · x-api-key<br/>directive + catálogo, perfil, histórico, now/timezone
+    N->>N: Validate input → Build prompt (blocos XML)
+    loop até 8 iterações do agente
+      N->>L: system prompt + fala atual
+      L-->>N: texto final ou tool call
+      opt tool call
+        N->>M: POST /{events,finance}-m2m/:profileId/execute<br/>{ operation, data }
+        M-->>N: resultado ou erro 400 legível (neverError)
+      end
+    end
+    N-->>A: { response }
+    A->>A: valida com Zod
+    A->>DB: persiste a resposta (type = AI)
+    A->>S: sendMessage(jid, response)
+    S->>B: socket.sendMessage
+    B-->>U: resposta do Jarvis
+  end

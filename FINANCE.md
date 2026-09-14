@@ -114,23 +114,23 @@ O `GET .../transactions` aceita `from`, `to`, `type`, `categoryId`, `accountId`,
 
 ### 5. Tools do assistente (`assistant/tools/finance.tools.ts`)
 
-Sete tools novas publicadas em `ASSISTANT_TOOLS` (enviadas ao n8n em toda mensagem), com descrições em pt-BR ensinando o vocabulário ao modelo. O tipo `AssistantToolEndpoint` ganhou o método `PATCH`.
+O módulo é publicado em `ASSISTANT_TOOLS` como **uma única tool `finance`** (`rpcToolName: 'finance'`), com os campos `operation` (nome exato da operação) e `data` (parâmetros da operação; o n8n envia como string JSON e o backend aceita objeto ou string). Cada operação é descrita de forma estruturada (quando usar, campos com tipo e obrigatoriedade, exemplo, observações) e essa descrição é renderizada no system prompt por `assistant/utils/build-system-prompt.ts`. Ver `ASSISTANT.md` para o desenho do prompt.
 
-| Tool | Endpoints |
+| Área | Operações |
 |---|---|
-| `finance-accounts` | `list_accounts`, `create_account` |
-| `finance-transactions` | `create_transaction`, `list_transactions`, `update_transaction`, `delete_transaction` |
-| `finance-categories` | `list_categories`, `create_category`, `update_category`, `delete_category` |
-| `finance-rules` | `list_rules`, `create_rule`, `update_rule`, `delete_rule` |
-| `finance-goals` | `list_goals`, `create_goal`, `update_goal`, `delete_goal` |
-| `finance-recurring` | `list_recurring_transactions`, `create_recurring_transaction`, `update_recurring_transaction`, `delete_recurring_transaction` |
-| `finance-investments` | `list_assets`, `create_asset`, `add_asset_value`, `list_asset_trades`, `record_asset_trade`, `delete_asset` |
+| Contas | `list_accounts`, `create_account` |
+| Transações | `create_transaction`, `list_transactions`, `update_transaction`, `delete_transaction` |
+| Categorias | `list_categories`, `create_category`, `update_category`, `delete_category` |
+| Regras | `list_rules`, `create_rule`, `update_rule`, `delete_rule` |
+| Metas | `list_goals`, `create_goal`, `update_goal`, `delete_goal` |
+| Recorrências | `list_recurring_transactions`, `create_recurring_transaction`, `update_recurring_transaction`, `delete_recurring_transaction` |
+| Investimentos | `list_assets`, `create_asset`, `add_asset_value`, `list_asset_trades`, `record_asset_trade`, `delete_asset` |
 
-Notas de comportamento que as tools já explicam ao modelo:
+Notas de comportamento que a referência já explica ao modelo:
 
 - **Salário** = recorrência com `type: credit`, `frequency: monthly` e `dayOfMonth` no dia do pagamento. O celery-beat do Securo materializa a transação real automaticamente (a cada hora) quando vence.
 - **Regras**: `create_rule` aplica retroativamente por padrão (`applyToExisting: true`) sem sobrescrever categorias manuais. O endpoint destrutivo `apply-all` do Securo (reseta notas/categorias) **não foi exposto** de propósito.
-- **Metas**: progresso manual — o modelo atualiza `currentAmount` quando o usuário diz que guardou dinheiro.
+- **Metas**: progresso manual — o modelo consulta `list_goals` e atualiza `currentAmount` quando o usuário diz que guardou dinheiro.
 - **Investimentos**: `record_asset_trade` recalcula preço médio, custo e ganho realizado; vender mais do que possui é rejeitado pelo Securo (422).
 
 ### 6. Variáveis de ambiente novas (`server/.env`)

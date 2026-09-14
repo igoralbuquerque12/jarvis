@@ -28,7 +28,7 @@ export class WhatsappAdminGuard implements CanActivate {
 
     if (!providedKey) {
       throw new UnauthorizedException(
-        'Administrative key is required in headers (x-admin-key, x-api-key, or Authorization: Bearer <key>).',
+        'Administrative key is required in headers (x-admin-key, x-whatsapp-admin-key, x-api-key, or Authorization: Bearer <key>).',
       );
     }
 
@@ -42,10 +42,15 @@ export class WhatsappAdminGuard implements CanActivate {
   private extractApiKey(request: Request): string | null {
     const headers = request.headers;
 
-    const customKey = headers['x-admin-key'];
-
-    if (typeof customKey === 'string' && customKey.trim().length > 0) {
-      return customKey.trim();
+    for (const headerName of [
+      'x-admin-key',
+      'x-whatsapp-admin-key',
+      'x-api-key',
+    ] as const) {
+      const customKey = headers[headerName];
+      if (typeof customKey === 'string' && customKey.trim().length > 0) {
+        return customKey.trim();
+      }
     }
 
     const authHeader = headers['authorization'];
