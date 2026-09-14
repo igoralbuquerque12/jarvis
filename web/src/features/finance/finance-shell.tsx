@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import { FinanceNav } from './components/finance-nav';
-import { PrivacyProvider } from './context/privacy-context';
 
+/** Finance section frame: tabs on top, pages stack below with a fixed gap. */
 export function FinanceShell({ children }: { children: ReactNode }) {
   return (
-    <PrivacyProvider>
+    <div className="page">
       <FinanceNav />
       {children}
-    </PrivacyProvider>
+    </div>
   );
 }
