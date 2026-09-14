@@ -1,10 +1,12 @@
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Alert } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardHeader } from '../../components/ui/card';
 import { Field, Select, TextArea, TextInput } from '../../components/ui/field';
+import { PageHeader } from '../../components/ui/page-header';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyProfile } from '../../hooks/use-my-profile';
 import { authClient } from '../../lib/auth-client';
@@ -75,22 +77,18 @@ function ProfileView({
   }
 
   return (
-    <>
-      <div className="page-head">
-        <span className="eyebrow">Perfil</span>
-        <h2>Sua identidade</h2>
-        <p>
-          O que você escreve aqui vira contexto para o Jarvis: quanto mais ele
-          souber sobre você, melhores ficam as respostas.
-        </p>
-        <span className="sunset-bar" aria-hidden="true" />
-      </div>
+    <div className="page">
+      <PageHeader
+        eyebrow="Perfil"
+        title="Sobre você"
+        description="O que você escreve aqui vira contexto para o Jarvis. Quanto mais ele souber, melhores ficam as respostas."
+      />
 
-      <div className="profile-grid">
+      <div className="cols">
         <Card>
           <CardHeader
             title="Dados do perfil"
-            subtitle="Informações usadas pela IA nas conversas."
+            subtitle="Informações usadas pelo assistente nas conversas."
           />
           <form onSubmit={(event) => void handleSubmit(event)}>
             <Field label="Nome" hint="Como o Jarvis deve te chamar.">
@@ -107,7 +105,7 @@ function ProfileView({
 
             <Field
               label="Sobre você"
-              hint="Rotina, preferências, trabalho, família — tudo que ajudar o Jarvis a te entender."
+              hint="Rotina, preferências, trabalho, família. Tudo que ajudar o Jarvis a te entender."
             >
               {(id) => (
                 <TextArea
@@ -122,7 +120,7 @@ function ProfileView({
 
             <Field
               label="Fuso horário"
-              hint="Usado para agendar seus eventos na hora certa."
+              hint="Usado para agendar seus lembretes na hora certa."
             >
               {(id) => (
                 <Select
@@ -153,37 +151,47 @@ function ProfileView({
           </form>
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Conta"
-            aside={<Badge variant="accent">{profile.subscription.name}</Badge>}
-          />
-          <dl style={{ margin: 0 }}>
-            <div className="account-row">
-              <dt>E-mail</dt>
-              <dd>{session?.user.email ?? '—'}</dd>
-            </div>
-            <div className="account-row">
-              <dt>WhatsApp</dt>
-              <dd>
-                {profile.whatsappLinked ? (
-                  <Badge variant="success">Conectado</Badge>
-                ) : (
-                  <Badge variant="neutral">Não conectado</Badge>
-                )}
-              </dd>
-            </div>
-            <div className="account-row">
-              <dt>Membro desde</dt>
-              <dd>
-                {new Intl.DateTimeFormat('pt-BR', {
-                  dateStyle: 'long',
-                }).format(new Date(profile.createdAt))}
-              </dd>
-            </div>
-          </dl>
-        </Card>
+        <div className="stack">
+          <Card>
+            <CardHeader
+              title="Conta"
+              aside={<Badge variant="accent">{profile.subscription.name}</Badge>}
+            />
+            <dl style={{ margin: 0 }}>
+              <div className="account-row">
+                <dt>E-mail</dt>
+                <dd>{session?.user.email ?? '—'}</dd>
+              </div>
+              <div className="account-row">
+                <dt>WhatsApp</dt>
+                <dd>
+                  {profile.whatsappLinked ? (
+                    <Badge variant="success">Conectado</Badge>
+                  ) : (
+                    <Link to="/dashboard#conectar">
+                      <Badge variant="accent">Conectar</Badge>
+                    </Link>
+                  )}
+                </dd>
+              </div>
+              {profile.whatsappNumber ? (
+                <div className="account-row">
+                  <dt>Número</dt>
+                  <dd className="mono">{profile.whatsappNumber}</dd>
+                </div>
+              ) : null}
+              <div className="account-row">
+                <dt>Membro desde</dt>
+                <dd>
+                  {new Intl.DateTimeFormat('pt-BR', {
+                    dateStyle: 'long',
+                  }).format(new Date(profile.createdAt))}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

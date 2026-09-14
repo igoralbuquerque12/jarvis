@@ -1,4 +1,4 @@
-import { usePrivacy } from '../context/privacy-context';
+import { usePrivacy } from '../context/privacy-store';
 
 interface AmountProps {
   value: number;

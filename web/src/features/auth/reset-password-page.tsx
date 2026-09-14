@@ -5,7 +5,6 @@ import { Alert } from '../../components/ui/alert';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Field, TextInput } from '../../components/ui/field';
-import { JarvisMark } from '../../components/ui/wordmark';
 import { resetPassword } from './auth.service';
 import { AuthLayout } from './components/auth-layout';
 
@@ -48,11 +47,8 @@ export function ResetPasswordPage() {
     <AuthLayout>
       <Card>
         <div className="auth__card-head">
-          <JarvisMark className="lockup__icon" />
-          <div>
-            <h2>Nova senha</h2>
-            <p>Escolha uma nova senha para a sua conta.</p>
-          </div>
+          <h2>Nova senha</h2>
+          <p>Escolha uma nova senha para a sua conta.</p>
         </div>
 
         {!token ? (
@@ -65,8 +61,8 @@ export function ResetPasswordPage() {
             <Alert variant="success">
               Senha redefinida com sucesso. Você já pode entrar.
             </Alert>
-            <Link to="/login">
-              <Button block>Ir para o login</Button>
+            <Link to="/login" className="btn btn--primary btn--block">
+              Ir para o login
             </Link>
           </div>
         ) : (

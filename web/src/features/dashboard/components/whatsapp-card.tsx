@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
+import { IconCopy } from '../../../components/ui/icons';
 import { assistantWhatsappNumber } from '../../../lib/config';
 import type { ProfileMe } from '../../../types/api';
 
@@ -20,7 +21,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 
   return (
     <Button variant="ghost" size="sm" onClick={() => void handleCopy()}>
-      {copied ? 'Copiado!' : label}
+      <IconCopy />
+      {copied ? 'Copiado' : label}
     </Button>
   );
 }
@@ -33,7 +35,7 @@ export function WhatsappCard({ profile }: { profile: ProfileMe }) {
 
   if (profile.whatsappLinked) {
     return (
-      <Card>
+      <Card id="conectar">
         <CardHeader
           title="WhatsApp"
           aside={<Badge variant="success">Conectado</Badge>}
@@ -42,27 +44,28 @@ export function WhatsappCard({ profile }: { profile: ProfileMe }) {
           <span className="connected-banner__dot" aria-hidden="true" />
           <div>
             <strong>Tudo certo por aqui.</strong>
-            <p className="muted" style={{ fontSize: '0.88rem' }}>
+            <p className="muted small">
               Conta vinculada ao número{' '}
-              <span className="mono">{profile.whatsappNumber}</span>. É só
-              conversar com o Jarvis.
+              <span className="mono">{profile.whatsappNumber}</span>.
             </p>
           </div>
         </div>
-        <p className="hint" style={{ marginTop: 14 }}>
-          Trocou de número? Envie o token abaixo pelo novo WhatsApp para
-          reconectar.
-        </p>
-        <div className="token-box">
-          <span className="token-box__value">{profile.token}</span>
-          <CopyButton value={profile.token} label="Copiar" />
-        </div>
+        <details className="disclosure">
+          <summary>Trocou de número?</summary>
+          <p className="hint" style={{ marginTop: 8 }}>
+            Envie o token abaixo pelo novo WhatsApp para reconectar.
+          </p>
+          <div className="token-box">
+            <span className="token-box__value">{profile.token}</span>
+            <CopyButton value={profile.token} label="Copiar" />
+          </div>
+        </details>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card id="conectar">
       <CardHeader
         title="Conectar WhatsApp"
         subtitle="Vincule seu número em menos de um minuto."
@@ -84,8 +87,13 @@ export function WhatsappCard({ profile }: { profile: ProfileMe }) {
           </p>
           {whatsappLink ? (
             <div style={{ marginTop: 10 }}>
-              <a href={whatsappLink} target="_blank" rel="noreferrer">
-                <Button size="sm">Abrir no WhatsApp</Button>
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn--primary btn--sm"
+              >
+                Abrir no WhatsApp
               </a>
             </div>
           ) : null}
@@ -98,7 +106,7 @@ export function WhatsappCard({ profile }: { profile: ProfileMe }) {
         </li>
       </ol>
       <p className="hint" style={{ marginTop: 18 }}>
-        Seu token é pessoal — não compartilhe com ninguém.
+        Seu token é pessoal. Não compartilhe com ninguém.
       </p>
     </Card>
   );

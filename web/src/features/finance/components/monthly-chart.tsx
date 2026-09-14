@@ -3,56 +3,58 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { monthRange, shiftYearMonth, currentYearMonth } from '../../../lib/dates';
 import { getMyTransactions } from '../../../services/finance.service';
+import { usePrivacy } from '../context/privacy-store';
 
 interface MonthData {
   month: string;
-  receita: number;
-  despesa: number;
+  Receita: number;
+  Despesa: number;
 }
+
+const INCOME = '#2f8f5b';
+const EXPENSE = '#c34a2b';
 
 function formatBRLShort(value: number): string {
-  if (value >= 1000) return `R$${(value / 1000).toFixed(1)}k`;
-  return `R$${value.toFixed(0)}`;
+  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+  return `R$ ${value.toFixed(0)}`;
 }
 
-function getPastMonths(count: number): Array<{ year: number; month: number; label: string }> {
-  const result = [];
-  const now = new Date();
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    result.push({
-      year: d.getFullYear(),
-      month: d.getMonth() + 1,
-      label: d.toLocaleString('pt-BR', { month: 'short' }).replace('.', ''),
-    });
-  }
-  return result;
+function formatBRL(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
 }
 
-export function MonthlyChart() {
+export function MonthlyChart({ months = 6 }: { months?: number }) {
+  const { hidden } = usePrivacy();
   const [chartData, setChartData] = useState<MonthData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    const months = getPastMonths(6);
+    const now = currentYearMonth();
+    const series = Array.from({ length: months }, (_, index) =>
+      shiftYearMonth(now, index - (months - 1)),
+    );
 
     Promise.all(
-      months.map(({ year, month, label }) => {
-        const from = `${year}-${String(month).padStart(2, '0')}-01`;
-        const lastDay = new Date(year, month, 0).getDate();
-        const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      series.map((ym) => {
+        const { from, to } = monthRange(ym);
+        const label = new Date(ym.year, ym.month - 1, 1)
+          .toLocaleString('pt-BR', { month: 'short' })
+          .replace('.', '');
         return getMyTransactions({ from, to, limit: 1 }).then((page) => ({
           month: label,
-          receita: page.summary.income,
-          despesa: page.summary.expense,
+          Receita: page.summary.income,
+          Despesa: page.summary.expense,
         }));
       }),
     )
@@ -60,7 +62,7 @@ export function MonthlyChart() {
         if (active) setChartData(data);
       })
       .catch(() => {
-        // fail silently — chart is optional
+        // chart is optional — fail silently
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -69,7 +71,7 @@ export function MonthlyChart() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [months]);
 
   if (loading) {
     return (
@@ -81,17 +83,25 @@ export function MonthlyChart() {
 
   return (
     <div className="monthly-chart">
+      <div className="chart-legend" style={{ marginBottom: 10 }}>
+        <span>
+          <i style={{ background: INCOME }} /> Receita
+        </span>
+        <span>
+          <i style={{ background: EXPENSE }} /> Despesa
+        </span>
+      </div>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={chartData}
           margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
           barGap={3}
-          barCategoryGap="28%"
+          barCategoryGap="30%"
         >
           <CartesianGrid
             strokeDasharray="3 3"
             vertical={false}
-            stroke="rgba(34,27,16,0.07)"
+            stroke="rgba(34,27,16,0.08)"
           />
           <XAxis
             dataKey="month"
@@ -100,20 +110,17 @@ export function MonthlyChart() {
             tickLine={false}
           />
           <YAxis
-            tickFormatter={formatBRLShort}
+            tickFormatter={hidden ? () => '' : formatBRLShort}
             tick={{ fontSize: 10, fill: '#a2957f', fontFamily: 'Space Grotesk' }}
             axisLine={false}
             tickLine={false}
-            width={52}
+            width={hidden ? 12 : 64}
           />
           <Tooltip
-            formatter={(val) => {
-              const num = typeof val === 'number' ? val : 0;
-              return new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format(num);
-            }}
+            cursor={{ fill: 'rgba(244,105,15,0.06)' }}
+            formatter={(value) =>
+              hidden ? '••••' : formatBRL(typeof value === 'number' ? value : 0)
+            }
             contentStyle={{
               background: '#fffdf8',
               border: '1px solid #e9dfcd',
@@ -122,13 +129,18 @@ export function MonthlyChart() {
               fontSize: 13,
             }}
           />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            wrapperStyle={{ fontSize: 12, fontFamily: 'Space Grotesk' }}
+          <Bar
+            dataKey="Receita"
+            fill={INCOME}
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
           />
-          <Bar dataKey="receita" fill="#2f8f5b" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="despesa" fill="#f4690f" radius={[4, 4, 0, 0]} />
+          <Bar
+            dataKey="Despesa"
+            fill={EXPENSE}
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

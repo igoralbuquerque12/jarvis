@@ -1,24 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
-import type { FinanceAccount, FinanceCategory, Transaction } from '../../../types/api';
+import { useState } from 'react';
+import { Alert } from '../../../components/ui/alert';
+import { Button } from '../../../components/ui/button';
+import { IconPlus } from '../../../components/ui/icons';
+import { Modal, ModalActions } from '../../../components/ui/modal';
+import { Segmented } from '../../../components/ui/segmented';
+import { todayISO } from '../../../lib/dates';
+import type {
+  FinanceAccount,
+  FinanceCategory,
+  Transaction,
+  TransactionType,
+} from '../../../types/api';
+
+export interface TransactionFormValues {
+  description: string;
+  amount: number;
+  type: TransactionType;
+  date: string;
+  categoryId?: string;
+  accountId?: string;
+  notes?: string;
+}
 
 interface TransactionFormProps {
   categories: FinanceCategory[];
   accounts: FinanceAccount[];
   initial?: Transaction;
-  onSubmit: (data: {
-    description: string;
-    amount: number;
-    type: 'debit' | 'credit';
-    date: string;
-    categoryId?: string;
-    accountId?: string;
-    notes?: string;
-  }) => Promise<void>;
+  onSubmit: (data: TransactionFormValues) => Promise<void>;
   onClose: () => void;
-}
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export function TransactionForm({
@@ -28,123 +37,98 @@ export function TransactionForm({
   onSubmit,
   onClose,
 }: TransactionFormProps) {
-  const [description, setDescription] = useState(initial?.description ?? '');
+  const [type, setType] = useState<TransactionType>(initial?.type ?? 'debit');
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
-  const [type, setType] = useState<'debit' | 'credit'>(initial?.type ?? 'debit');
+  const [description, setDescription] = useState(initial?.description ?? '');
   const [date, setDate] = useState(initial?.date ?? todayISO());
   const [categoryId, setCategoryId] = useState(initial?.category?.id ?? '');
   const [accountId, setAccountId] = useState(initial?.account?.id ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [showNotes, setShowNotes] = useState(Boolean(initial?.notes));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
 
-  useEffect(() => {
-    dialogRef.current?.showModal();
-    return () => dialogRef.current?.close();
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const parsed = parseFloat(amount);
-    if (isNaN(parsed) || parsed <= 0) {
-      setFormError('Informe um valor positivo.');
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const parsed = parseFloat(amount.replace(',', '.'));
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      setFormError('Informe um valor maior que zero.');
       return;
     }
     setSaving(true);
     setFormError(null);
     try {
       await onSubmit({
-        description,
+        description: description.trim(),
         amount: parsed,
         type,
         date,
         categoryId: categoryId || undefined,
         accountId: accountId || undefined,
-        notes: notes || undefined,
+        notes: notes.trim() || undefined,
       });
       onClose();
-    } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : 'Erro ao salvar.');
+    } catch (error: unknown) {
+      setFormError(error instanceof Error ? error.message : 'Erro ao salvar.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="modal"
+    <Modal
+      title={initial ? 'Editar transação' : 'Nova transação'}
       onClose={onClose}
-      onClick={(e) => e.target === dialogRef.current && onClose()}
     >
-      <div className="modal__box">
-        <div className="modal__header">
-          <h3 className="modal__title">
-            {initial ? 'Editar Transação' : 'Nova Transação'}
-          </h3>
-          <button
-            type="button"
-            className="modal__close"
-            onClick={onClose}
-            aria-label="Fechar"
-          >
-            ×
-          </button>
-        </div>
+      <form className="form" onSubmit={(event) => void handleSubmit(event)}>
+        <Segmented<TransactionType>
+          className="tx-form__type"
+          label="Tipo"
+          block
+          value={type}
+          onChange={setType}
+          options={[
+            { value: 'debit', label: 'Despesa', tone: 'danger' },
+            { value: 'credit', label: 'Receita', tone: 'success' },
+          ]}
+        />
 
-        <form onSubmit={(e) => void handleSubmit(e)}>
-          {/* Type switch */}
-          <div className="auth__switch" style={{ marginBottom: 20 }}>
-            <button
-              type="button"
-              className="auth__switch-btn"
-              aria-selected={type === 'debit'}
-              onClick={() => setType('debit')}
-            >
-              Despesa
-            </button>
-            <button
-              type="button"
-              className="auth__switch-btn"
-              aria-selected={type === 'credit'}
-              onClick={() => setType('credit')}
-            >
-              Receita
-            </button>
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="tx-description">
-              Descrição
-            </label>
-            <input
-              id="tx-description"
-              className="input"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              placeholder="Ex: Supermercado"
-            />
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="tx-amount">
-              Valor (R$)
-            </label>
+        <div className="field">
+          <label className="label" htmlFor="tx-amount">
+            Valor
+          </label>
+          <div className="money-input">
+            <span className="money-input__prefix">R$</span>
             <input
               id="tx-amount"
-              className="input"
               type="number"
+              inputMode="decimal"
               step="0.01"
               min="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
+              onChange={(event) => setAmount(event.target.value)}
               placeholder="0,00"
+              autoFocus
+              required
             />
           </div>
+        </div>
 
+        <div className="field">
+          <label className="label" htmlFor="tx-description">
+            Descrição
+          </label>
+          <input
+            id="tx-description"
+            className="input"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder={type === 'debit' ? 'Ex.: Supermercado' : 'Ex.: Salário'}
+            required
+          />
+        </div>
+
+        <div className="field-row">
           <div className="field">
             <label className="label" htmlFor="tx-date">
               Data
@@ -154,11 +138,10 @@ export function TransactionForm({
               className="input"
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(event) => setDate(event.target.value)}
               required
             />
           </div>
-
           <div className="field">
             <label className="label" htmlFor="tx-category">
               Categoria
@@ -167,77 +150,79 @@ export function TransactionForm({
               id="tx-category"
               className="select"
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={(event) => setCategoryId(event.target.value)}
             >
               <option value="">Sem categoria</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.icon ? `${category.icon} ` : ''}
+                  {category.name}
                 </option>
               ))}
             </select>
           </div>
+        </div>
 
-          {accounts.length > 1 && (
-            <div className="field">
-              <label className="label" htmlFor="tx-account">
-                Conta
-              </label>
-              <select
-                id="tx-account"
-                className="select"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-              >
-                <option value="">Padrão (Carteira)</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {accounts.length > 1 ? (
+          <div className="field">
+            <label className="label" htmlFor="tx-account">
+              Conta
+            </label>
+            <select
+              id="tx-account"
+              className="select"
+              value={accountId}
+              onChange={(event) => setAccountId(event.target.value)}
+            >
+              <option value="">Conta padrão</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
+        {showNotes ? (
           <div className="field">
             <label className="label" htmlFor="tx-notes">
-              Observações
+              Observação
             </label>
             <textarea
               id="tx-notes"
-              className="textarea"
+              className="textarea textarea--short"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Opcional"
-              style={{ minHeight: 72 }}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Detalhes que ajudem a lembrar deste lançamento"
             />
           </div>
-
-          {formError && (
-            <div className="alert alert--error" style={{ marginTop: 12 }}>
-              {formError}
-            </div>
-          )}
-
-          <div className="modal__actions">
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={saving}
-            >
-              {saving ? 'Salvando…' : initial ? 'Salvar' : 'Adicionar'}
-            </button>
+        ) : (
+          <div>
+            <Button variant="subtle" size="sm" onClick={() => setShowNotes(true)}>
+              <IconPlus />
+              Adicionar observação
+            </Button>
           </div>
-        </form>
-      </div>
-    </dialog>
+        )}
+
+        {formError ? <Alert variant="error">{formError}</Alert> : null}
+
+        <ModalActions>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving
+              ? 'Salvando…'
+              : initial
+                ? 'Salvar alterações'
+                : type === 'debit'
+                  ? 'Registrar despesa'
+                  : 'Registrar receita'}
+          </Button>
+        </ModalActions>
+      </form>
+    </Modal>
   );
 }

@@ -8,17 +8,27 @@ import { FinanceShell } from './features/finance/finance-shell';
 import { FinanceGoalsPage } from './features/finance/pages/finance-goals-page';
 import { FinanceInvestmentsPage } from './features/finance/pages/finance-investments-page';
 import { FinanceOverviewPage } from './features/finance/pages/finance-overview-page';
-import { FinanceRecurringPage } from './features/finance/pages/finance-recurring-page';
 import { FinanceSettingsPage } from './features/finance/pages/finance-settings-page';
 import { FinanceTransactionsPage } from './features/finance/pages/finance-transactions-page';
 import { PlansPage } from './features/plans/plans-page';
 import { ProfilePage } from './features/profile/profile-page';
+import { ApiDocsPage } from './features/settings/pages/api-docs-page';
+import { ApiKeysPage } from './features/settings/pages/api-keys-page';
+import { SettingsShell } from './features/settings/settings-shell';
 
 function ProtectedPage({ children }: { children: React.ReactNode }) {
   return (
     <RequireAuth>
       <AppShell>{children}</AppShell>
     </RequireAuth>
+  );
+}
+
+function FinancePage({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedPage>
+      <FinanceShell>{children}</FinanceShell>
+    </ProtectedPage>
   );
 }
 
@@ -52,65 +62,78 @@ export default function App() {
           </ProtectedPage>
         }
       />
+      {/* Settings routes */}
+      <Route
+        path="/configuracoes"
+        element={<Navigate replace to="/configuracoes/api" />}
+      />
+      <Route
+        path="/configuracoes/api"
+        element={
+          <ProtectedPage>
+            <SettingsShell>
+              <ApiKeysPage />
+            </SettingsShell>
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/configuracoes/documentacao"
+        element={
+          <ProtectedPage>
+            <SettingsShell>
+              <ApiDocsPage />
+            </SettingsShell>
+          </ProtectedPage>
+        }
+      />
       {/* Finance routes */}
       <Route
         path="/financas"
         element={
-          <ProtectedPage>
-            <FinanceShell>
-              <FinanceOverviewPage />
-            </FinanceShell>
-          </ProtectedPage>
+          <FinancePage>
+            <FinanceOverviewPage />
+          </FinancePage>
         }
       />
       <Route
         path="/financas/transacoes"
         element={
-          <ProtectedPage>
-            <FinanceShell>
-              <FinanceTransactionsPage />
-            </FinanceShell>
-          </ProtectedPage>
+          <FinancePage>
+            <FinanceTransactionsPage view="ledger" />
+          </FinancePage>
         }
       />
       <Route
         path="/financas/recorrencias"
         element={
-          <ProtectedPage>
-            <FinanceShell>
-              <FinanceRecurringPage />
-            </FinanceShell>
-          </ProtectedPage>
+          <FinancePage>
+            <FinanceTransactionsPage view="recurring" />
+          </FinancePage>
         }
       />
       <Route
         path="/financas/metas"
         element={
-          <ProtectedPage>
-            <FinanceShell>
-              <FinanceGoalsPage />
-            </FinanceShell>
-          </ProtectedPage>
+          <FinancePage>
+            <FinanceGoalsPage />
+          </FinancePage>
         }
       />
       <Route
         path="/financas/investimentos"
         element={
-          <ProtectedPage>
-            <FinanceShell>
-              <FinanceInvestmentsPage />
-            </FinanceShell>
-          </ProtectedPage>
+          <FinancePage>
+            <FinanceInvestmentsPage />
+          </FinancePage>
         }
       />
       <Route
         path="/financas/configuracoes"
         element={
-          <ProtectedPage>
-            <FinanceShell>
-              <FinanceSettingsPage />
-            </FinanceShell>
-          </ProtectedPage>
+          <FinancePage>
+            <FinanceSettingsPage />
+          </FinancePage>
         }
       />
       <Route path="/home" element={<Navigate replace to="/dashboard" />} />
@@ -118,4 +141,3 @@ export default function App() {
     </Routes>
   );
 }
-

@@ -5,8 +5,8 @@ import { Alert } from '../../components/ui/alert';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Field, TextInput } from '../../components/ui/field';
+import { Segmented } from '../../components/ui/segmented';
 import { Spinner } from '../../components/ui/spinner';
-import { JarvisMark } from '../../components/ui/wordmark';
 import { authClient } from '../../lib/auth-client';
 import {
   requestPasswordReset,
@@ -20,6 +20,21 @@ type Mode = 'signIn' | 'signUp' | 'forgot';
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
+
+const HEADINGS: Record<Mode, { title: string; subtitle: string }> = {
+  signIn: {
+    title: 'Bem-vindo de volta',
+    subtitle: 'Entre para ver seus lembretes, gastos e metas.',
+  },
+  signUp: {
+    title: 'Criar sua conta',
+    subtitle: 'Leva menos de um minuto para começar.',
+  },
+  forgot: {
+    title: 'Recuperar acesso',
+    subtitle: 'Informe seu e-mail e enviaremos um link de redefinição.',
+  },
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -73,54 +88,30 @@ export function LoginPage() {
     }
   }
 
-  const cardHead =
-    mode === 'signIn'
-      ? {
-          title: 'Bem-vindo de volta',
-          subtitle: 'Entre para acompanhar seus lembretes e eventos.',
-        }
-      : mode === 'signUp'
-        ? {
-            title: 'Criar sua conta',
-            subtitle: 'Leva menos de um minuto para começar.',
-          }
-        : {
-            title: 'Recuperar acesso',
-            subtitle: 'Informe seu e-mail e enviaremos um link de redefinição.',
-          };
+  const heading = HEADINGS[mode];
+  const submitLabel =
+    mode === 'signIn' ? 'Entrar' : mode === 'signUp' ? 'Criar conta' : 'Enviar link';
 
   return (
     <AuthLayout>
       <Card>
         <div className="auth__card-head">
-          <JarvisMark className="lockup__icon" />
-          <div>
-            <h2>{cardHead.title}</h2>
-            <p>{cardHead.subtitle}</p>
-          </div>
+          <h2>{heading.title}</h2>
+          <p>{heading.subtitle}</p>
         </div>
 
         {mode !== 'forgot' ? (
-          <div className="auth__switch" role="tablist" aria-label="Acesso">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'signIn'}
-              className="auth__switch-btn"
-              onClick={() => switchMode('signIn')}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'signUp'}
-              className="auth__switch-btn"
-              onClick={() => switchMode('signUp')}
-            >
-              Criar conta
-            </button>
-          </div>
+          <Segmented<Mode>
+            className="auth__switch"
+            label="Acesso"
+            block
+            value={mode}
+            onChange={switchMode}
+            options={[
+              { value: 'signIn', label: 'Entrar' },
+              { value: 'signUp', label: 'Criar conta' },
+            ]}
+          />
         ) : null}
 
         <form onSubmit={(event) => void handleSubmit(event)}>
@@ -180,13 +171,7 @@ export function LoginPage() {
             {notice ? <Alert variant="success">{notice}</Alert> : null}
 
             <Button type="submit" block disabled={submitting}>
-              {submitting
-                ? 'Aguarde…'
-                : mode === 'signIn'
-                  ? 'Entrar'
-                  : mode === 'signUp'
-                    ? 'Criar conta'
-                    : 'Enviar link'}
+              {submitting ? 'Aguarde…' : submitLabel}
             </Button>
 
             <div className="auth__link-row">
