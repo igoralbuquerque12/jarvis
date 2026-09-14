@@ -175,3 +175,19 @@ export interface AssetTrade {
   date: string;
   createdAt: string;
 }
+
+// ── API keys ─────────────────────────────────────────────────────────────────
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  active: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+/** Returned only once, right after creation. */
+export interface CreatedApiKey extends ApiKey {
+  secret: string;
+}
