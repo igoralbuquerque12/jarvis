@@ -91,6 +91,7 @@ model Profile {
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventSeries    EventSeries[]
   securoAccount  SecuroAccount?
+  apiKeys        ApiKey[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -176,6 +177,22 @@ model SecuroAccount {
   updatedAt        DateTime            @updatedAt
 
   @@map("securo_accounts")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid()) @db.Uuid
+  profileId  String    @db.Uuid
+  name       String
+  prefix     String
+  hash       String    @unique
+  active     Boolean   @default(true)
+  lastUsedAt DateTime?
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([profileId])
+  @@map("api_keys")
 }
 
 enum SecuroAccountStatus {
