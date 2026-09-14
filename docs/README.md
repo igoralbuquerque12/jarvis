@@ -76,7 +76,7 @@ O projeto é um monorepo com backend NestJS, frontend React, um workflow n8n ver
 
 **4. Scheduler idempotente e barato.** Eventos são normalizados para múltiplos de 10 minutos e processados por um cron de 10 em 10 minutos que só consulta o banco quando um cache de 2 horas no Redis expira. O claim é um `updateMany` atômico (`PENDING → PROCESSING`), a próxima ocorrência é calculada com Luxon no fuso do perfil e a duplicidade é impedida por uma constraint `UNIQUE (seriesId, scheduledAt)`.
 
-**5. Motor financeiro isolado por usuário.** O [Securo](https://github.com/usesecuro/securo) (gestor financeiro open source em FastAPI) roda como serviço interno com banco e workers próprios. Cada perfil do Jarvis vira um usuário do Securo, provisionado em segundo plano no cadastro e autocorrigido no primeiro uso. As senhas nunca são armazenadas: são derivadas por `HMAC-SHA256(segredo, profileId)`.
+**5. Motor financeiro isolado por usuário.** O [Securo](https://github.com/securo-finance/securo) (gestor financeiro open source em FastAPI) roda como serviço interno com banco e workers próprios. Cada perfil do Jarvis vira um usuário do Securo, provisionado em segundo plano no cadastro e autocorrigido no primeiro uso. As senhas nunca são armazenadas: são derivadas por `HMAC-SHA256(segredo, profileId)`.
 
 **6. Segurança em camadas.** Três mecanismos de autenticação distintos para três públicos (sessão para a web, API key com hash SHA-256 para sistemas externos, chave administrativa com comparação em tempo constante para a rede interna), credenciais do WhatsApp cifradas com AES-256-GCM no banco, e nenhuma porta de serviço interno publicada no host.
 
