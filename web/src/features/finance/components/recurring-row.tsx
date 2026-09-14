@@ -1,4 +1,8 @@
+import { IconButton } from '../../../components/ui/button';
+import { IconRepeat, IconTrash } from '../../../components/ui/icons';
+import { formatISODate } from '../../../lib/dates';
 import type { RecurringTransaction } from '../../../types/api';
+import { FREQUENCY_LABELS } from '../frequency';
 import { Amount } from './amount';
 
 interface RecurringRowProps {
@@ -6,43 +10,24 @@ interface RecurringRowProps {
   onDelete?: (id: string) => void;
 }
 
-const FREQ_LABELS: Record<string, string> = {
-  daily: 'Diário',
-  weekly: 'Semanal',
-  monthly: 'Mensal',
-  yearly: 'Anual',
-};
-
-function TrashIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      width={16}
-      height={16}
-    >
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4h6v2" />
-    </svg>
-  );
-}
-
 export function RecurringRow({ item, onDelete }: RecurringRowProps) {
+  const meta = [
+    FREQUENCY_LABELS[item.frequency] ?? item.frequency,
+    item.dayOfMonth != null ? `dia ${item.dayOfMonth}` : null,
+    item.category?.name ?? null,
+    item.nextDueDate ? `próxima em ${formatISODate(item.nextDueDate)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <li className="tx-row">
-      <div className="tx-row__type-dot" data-type={item.type} />
+      <span className="tx-row__icon" data-type={item.type} aria-hidden="true">
+        {item.category?.icon ? item.category.icon : <IconRepeat />}
+      </span>
       <div className="tx-row__body">
         <span className="tx-row__description">{item.description}</span>
-        <span className="tx-row__meta">
-          {FREQ_LABELS[item.frequency] ?? item.frequency}
-          {item.dayOfMonth != null && ` · dia ${item.dayOfMonth}`}
-          {item.category && ` · ${item.category.name}`}
-        </span>
+        <span className="tx-row__meta">{meta}</span>
       </div>
       <Amount
         value={item.type === 'credit' ? item.amount : -item.amount}
@@ -50,17 +35,18 @@ export function RecurringRow({ item, onDelete }: RecurringRowProps) {
         colored
         className="tx-row__amount"
       />
-      {onDelete && (
+      {onDelete ? (
         <div className="tx-row__actions">
-          <button
-            type="button"
-            className="tx-row__action-btn tx-row__action-btn--danger"
-            title="Excluir recorrência"
+          <IconButton
+            label="Excluir conta fixa"
+            danger
             onClick={() => onDelete(item.id)}
           >
-            <TrashIcon />
-          </button>
+            <IconTrash />
+          </IconButton>
         </div>
+      ) : (
+        <span />
       )}
     </li>
   );
