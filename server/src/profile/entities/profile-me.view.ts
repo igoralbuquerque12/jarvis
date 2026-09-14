@@ -1,6 +1,11 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma, Profile } from '@prisma/client';
 
 const WHATSAPP_JID_SUFFIX = '@s.whatsapp.net';
+
+/** True once the profile was paired over WhatsApp (jid is a real number). */
+export function isWhatsappLinked(profile: Pick<Profile, 'jid'>): boolean {
+  return profile.jid.endsWith(WHATSAPP_JID_SUFFIX);
+}
 
 export type ProfileWithSubscription = Prisma.ProfileGetPayload<{
   include: { subscription: true };
@@ -33,7 +38,7 @@ function maskWhatsappNumber(jid: string): string {
 export function toProfileMeView(
   profile: ProfileWithSubscription,
 ): ProfileMeView {
-  const whatsappLinked = profile.jid.endsWith(WHATSAPP_JID_SUFFIX);
+  const whatsappLinked = isWhatsappLinked(profile);
 
   return {
     name: profile.name,
