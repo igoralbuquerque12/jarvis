@@ -1,73 +1,56 @@
-﻿import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { Card, CardHeader } from '../../../components/ui/card';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { IconArrowRight, IconTarget } from '../../../components/ui/icons';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyGoals } from '../../../hooks/use-my-goals';
 import { GoalCard } from '../../finance/components/goal-card';
-import { PrivacyProvider } from '../../finance/context/privacy-context';
 
-function ArrowIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      width={14}
-      height={14}
-      aria-hidden="true"
-    >
-      <path d="M5 12h14M12 5l7 7-7 7" />
-    </svg>
-  );
-}
+const VISIBLE = 3;
 
-function GoalsContent() {
+/** Read-only preview of the first few goals. */
+export function DashGoalsCard() {
   const { goals, loading } = useMyGoals();
-  const visibleGoals = goals.slice(0, 3);
+  const active = goals.filter((goal) => goal.currentAmount < goal.targetAmount);
+  const visible = active.slice(0, VISIBLE);
+  const rest = active.length - visible.length;
 
   return (
-    <div className="card dash-goals-card">
-      <div className="card__header">
-        <div>
-          <span className="eyebrow">Metas</span>
-          <h3 className="card__title" style={{ marginTop: 4 }}>
-            Minhas metas
-          </h3>
-        </div>
-        <Link to="/financas/metas" className="btn btn--ghost btn--sm">
-          Ver todas <ArrowIcon />
-        </Link>
-      </div>
+    <Card>
+      <CardHeader
+        title="Metas"
+        subtitle={
+          active.length > 0
+            ? `${active.length} em andamento`
+            : 'Objetivos de economia'
+        }
+        aside={
+          <Link to="/financas/metas" className="btn btn--ghost btn--sm">
+            Ver todas <IconArrowRight />
+          </Link>
+        }
+      />
 
       {loading ? (
-        <Spinner />
-      ) : visibleGoals.length === 0 ? (
-        <div className="event-empty">
-          <strong>Nenhuma meta criada</strong>
-          Crie sua primeira meta em{' '}
-          <Link to="/financas/metas">Financas - Metas</Link> ou peca ao Jarvis
-          no WhatsApp.
+        <div className="spinner-wrap">
+          <Spinner />
         </div>
+      ) : visible.length === 0 ? (
+        <EmptyState icon={<IconTarget />} title="Nenhuma meta em andamento">
+          Crie uma meta em Finanças ou peça ao Jarvis no WhatsApp.
+        </EmptyState>
       ) : (
-        <div className="dash-goals-list">
-          {visibleGoals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} />
+        <div className="stack stack--tight">
+          {visible.map((goal) => (
+            <GoalCard key={goal.id} goal={goal} compact />
           ))}
-          {goals.length > 3 && (
-            <Link to="/financas/metas" className="dash-goals-more">
-              +{goals.length - 3} meta{goals.length - 3 > 1 ? 's' : ''} - ver todas
+          {rest > 0 ? (
+            <Link to="/financas/metas" className="btn btn--subtle btn--sm">
+              Mais {rest} {rest > 1 ? 'metas' : 'meta'}
             </Link>
-          )}
+          ) : null}
         </div>
       )}
-    </div>
-  );
-}
-
-/** Card de metas (read-only) para o painel principal */
-export function DashGoalsCard() {
-  return (
-    <PrivacyProvider>
-      <GoalsContent />
-    </PrivacyProvider>
+    </Card>
   );
 }

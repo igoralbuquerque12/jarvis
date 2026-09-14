@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Alert } from '../../../components/ui/alert';
 import { Badge } from '../../../components/ui/badge';
-import { Button } from '../../../components/ui/button';
+import { IconButton } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { IconBell, IconTrash } from '../../../components/ui/icons';
 import { Spinner } from '../../../components/ui/spinner';
 import { describeRecurrence, formatEventInstant } from '../../../lib/format';
 import { cancelMyEventSeries } from '../../../services/events.service';
@@ -32,8 +34,8 @@ function EventItem({
   async function handleCancel() {
     const confirmed = window.confirm(
       event.series.type === 'RECURRENCE'
-        ? 'Cancelar este evento recorrente? Todas as próximas ocorrências serão canceladas.'
-        : 'Cancelar este evento?',
+        ? 'Cancelar este lembrete recorrente? Todas as próximas ocorrências serão canceladas.'
+        : 'Cancelar este lembrete?',
     );
     if (!confirmed) {
       return;
@@ -48,7 +50,7 @@ function EventItem({
       setCancelError(
         error instanceof Error
           ? error.message
-          : 'Não foi possível cancelar o evento.',
+          : 'Não foi possível cancelar o lembrete.',
       );
       setCancelling(false);
     }
@@ -81,14 +83,14 @@ function EventItem({
           </div>
         ) : null}
       </div>
-      <Button
-        variant="danger"
-        size="sm"
+      <IconButton
+        label="Cancelar lembrete"
+        danger
         onClick={() => void handleCancel()}
         disabled={cancelling}
       >
-        {cancelling ? 'Cancelando…' : 'Cancelar'}
-      </Button>
+        <IconTrash />
+      </IconButton>
     </li>
   );
 }
@@ -103,8 +105,8 @@ export function EventsCard({
   return (
     <Card>
       <CardHeader
-        title="Próximos eventos"
-        subtitle="Lembretes e compromissos que o Jarvis vai te enviar."
+        title="Próximos lembretes"
+        subtitle="O que o Jarvis vai te enviar no WhatsApp."
         aside={
           events.length > 0 ? (
             <Badge variant="accent">{events.length}</Badge>
@@ -113,15 +115,16 @@ export function EventsCard({
       />
 
       {loading ? (
-        <Spinner />
+        <div className="spinner-wrap">
+          <Spinner />
+        </div>
       ) : error ? (
         <Alert variant="error">{error}</Alert>
       ) : events.length === 0 ? (
-        <div className="event-empty">
-          <strong>Nada agendado</strong>
-          Peça ao Jarvis no WhatsApp — por exemplo, «me lembra amanhã às 9h de
+        <EmptyState icon={<IconBell />} title="Nada agendado">
+          Peça ao Jarvis no WhatsApp. Por exemplo: «me lembra amanhã às 9h de
           pagar o boleto».
-        </div>
+        </EmptyState>
       ) : (
         <ul className="event-list">
           {events.map((event) => (

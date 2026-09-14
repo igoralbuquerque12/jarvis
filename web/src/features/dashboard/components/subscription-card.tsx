@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom';
 import { Badge } from '../../../components/ui/badge';
 import { Card, CardHeader } from '../../../components/ui/card';
+import { IconArrowRight } from '../../../components/ui/icons';
 import { formatCurrencyBRL } from '../../../lib/format';
 import type { ProfileMe } from '../../../types/api';
 
@@ -14,7 +16,14 @@ export function SubscriptionCard({ profile }: { profile: ProfileMe }) {
     <Card>
       <CardHeader
         title="Seu plano"
-        aside={<Badge variant="accent">{subscription.name}</Badge>}
+        aside={
+          <>
+            <Badge variant="accent">{subscription.name}</Badge>
+            <Link to="/planos" className="btn btn--subtle btn--sm">
+              Ver planos <IconArrowRight />
+            </Link>
+          </>
+        }
       />
       <div className="plan-price">
         <span className="plan-price__value">
