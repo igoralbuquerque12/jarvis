@@ -4,11 +4,20 @@ import { MessageType } from '@prisma/client/edge';
 import { IncomingMessageDto } from '../dto/receive-message.dto';
 import { ProfileService } from '../../profile/services/profile.service';
 import { MessagesService } from '../../messages/services/messages.service';
-import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import { AssistantWorkflowService } from './assistant-workflow.service';
 import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import { AssistantConnectionService } from './assistant-connection.service';
 import { ASSISTANT_TOOLS } from '../tools/main.tools';
+import {
+  buildDirective,
+  buildTemporalContext,
+} from '../utils/build-system-prompt';
+import type { ReceiveMessageWorkflowInput } from '../entities/receive-message-workflow-input';
+
+const HISTORY_SIZE = 10;
+
+/** Static for the process lifetime: instructions + rendered tool catalogue. */
+const DIRECTIVE = buildDirective(ASSISTANT_TOOLS);
 
 @Injectable()
 export class AssistantMainService {
@@ -51,10 +60,17 @@ export class AssistantMainService {
         };
       }
 
-      const lastMessages = await this.messagesService.findAll({
+      // Loaded before persisting the current message, so it is never
+      // duplicated between `lastMessages` and `currentMessage`.
+      const history = await this.messagesService.findAll({
         userId: profile.id,
-        take: 10,
+        take: HISTORY_SIZE,
       });
+      const lastMessages = history.map(({ type, content, createdAt }) => ({
+        type,
+        content,
+        createdAt,
+      }));
 
       await this.messagesService.create({
         userId: profile.id,
@@ -62,18 +78,27 @@ export class AssistantMainService {
         type: MessageType.user,
       });
 
-      const workflowInput = {
-        directive: DEFAULT_DIRECTIVE,
+      const workflowInput: ReceiveMessageWorkflowInput = {
+        directive: DIRECTIVE,
         profileId: profile.id,
         profileContext: profile.about,
-        currentMessage: currentMessage,
+        currentMessage,
         lastMessages,
         tools: ASSISTANT_TOOLS,
+        ...buildTemporalContext(profile.timezone),
       };
-      console.log('Workflow input:', JSON.stringify(workflowInput));
+      this.logger.debug(
+        `Workflow input for profile ${profile.id}: ${JSON.stringify({
+          ...workflowInput,
+          directive: `[${DIRECTIVE.length} chars]`,
+          tools: `[${ASSISTANT_TOOLS.length} modules]`,
+        })}`,
+      );
+
       const responseWorkflow =
         await this.assistantWorkflowService.fetch(workflowInput);
-      console.log('Response from workflow:', responseWorkflow);
+      this.logger.debug(`Workflow response: ${responseWorkflow.response}`);
+
       await this.messagesService.create({
         userId: profile.id,
         content: responseWorkflow.response,
@@ -89,7 +114,7 @@ export class AssistantMainService {
         ok: true,
       };
     } catch (error) {
-      console.error('Error in receiveMessage:', error);
+      this.logger.error('Error in receiveMessage', error);
       return {
         ok: false,
         error: error instanceof Error ? error.message : 'Unknown error',

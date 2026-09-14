@@ -1,84 +1,77 @@
 import { ASSISTANT_TOOLS } from '../tools/main.tools';
 
+const operationNames = (module: string) =>
+  ASSISTANT_TOOLS.find((tool) => tool.module === module)?.endpoints.flatMap(
+    (endpoint) => endpoint.operations.map((operation) => operation.name),
+  );
+
 describe('ASSISTANT_TOOLS', () => {
-  it('publishes the events contracts without the guideline endpoint', () => {
+  it('publishes the events operations as one tool per operation, without the guideline', () => {
     const eventsTool = ASSISTANT_TOOLS.find((tool) => tool.module === 'events');
 
-    expect(eventsTool?.endpoints.map((endpoint) => endpoint.name)).toEqual([
+    expect(eventsTool?.endpoints).toHaveLength(1);
+    expect(eventsTool?.endpoints[0].rpcToolName).toBeUndefined();
+    expect(eventsTool?.endpoints[0].path).toBe(
+      '/events-m2m/:profileId/execute',
+    );
+    expect(operationNames('events')).toEqual([
       'create_event',
+      'find_active_events',
       'delete_event',
-      'list_active_events',
     ]);
-    expect(
-      eventsTool?.endpoints.some((endpoint) =>
-        endpoint.path.endsWith('guideline'),
-      ),
-    ).toBe(false);
   });
 
-  it('publishes the finance contracts for every financial area', () => {
-    const financeEndpoints: Record<string, string[]> = {
-      'finance-accounts': ['list_accounts', 'create_account'],
-      'finance-transactions': [
-        'create_transaction',
-        'list_transactions',
-        'update_transaction',
-        'delete_transaction',
-      ],
-      'finance-categories': [
-        'list_categories',
-        'create_category',
-        'update_category',
-        'delete_category',
-      ],
-      'finance-rules': [
-        'list_rules',
-        'create_rule',
-        'update_rule',
-        'delete_rule',
-      ],
-      'finance-goals': [
-        'list_goals',
-        'create_goal',
-        'update_goal',
-        'delete_goal',
-      ],
-      'finance-recurring': [
-        'list_recurring_transactions',
-        'create_recurring_transaction',
-        'update_recurring_transaction',
-        'delete_recurring_transaction',
-      ],
-      'finance-investments': [
-        'list_assets',
-        'create_asset',
-        'add_asset_value',
-        'list_asset_trades',
-        'record_asset_trade',
-        'delete_asset',
-      ],
-    };
-
-    for (const [module, endpointNames] of Object.entries(financeEndpoints)) {
-      const tool = ASSISTANT_TOOLS.find((entry) => entry.module === module);
-
-      expect(tool?.endpoints.map((endpoint) => endpoint.name)).toEqual(
-        endpointNames,
-      );
-    }
-  });
-
-  it('targets only finance-m2m paths scoped by profileId in finance tools', () => {
-    const financeTools = ASSISTANT_TOOLS.filter((tool) =>
-      tool.module.startsWith('finance-'),
+  it('publishes every finance operation behind the single "finance" RPC tool', () => {
+    const financeTool = ASSISTANT_TOOLS.find(
+      (tool) => tool.module === 'finance',
     );
 
-    expect(financeTools.length).toBeGreaterThan(0);
+    expect(financeTool?.endpoints).toHaveLength(1);
+    expect(financeTool?.endpoints[0].rpcToolName).toBe('finance');
+    expect(financeTool?.endpoints[0].path).toBe(
+      '/finance-m2m/:profileId/execute',
+    );
+    expect(operationNames('finance')).toEqual([
+      'list_accounts',
+      'create_account',
+      'create_transaction',
+      'list_transactions',
+      'update_transaction',
+      'delete_transaction',
+      'list_categories',
+      'create_category',
+      'update_category',
+      'delete_category',
+      'list_rules',
+      'create_rule',
+      'update_rule',
+      'delete_rule',
+      'list_goals',
+      'create_goal',
+      'update_goal',
+      'delete_goal',
+      'list_recurring_transactions',
+      'create_recurring_transaction',
+      'update_recurring_transaction',
+      'delete_recurring_transaction',
+      'list_assets',
+      'create_asset',
+      'add_asset_value',
+      'list_asset_trades',
+      'record_asset_trade',
+      'delete_asset',
+    ]);
+  });
 
-    for (const tool of financeTools) {
+  it('describes every operation with usage, at least one field line and an example', () => {
+    for (const tool of ASSISTANT_TOOLS) {
       for (const endpoint of tool.endpoints) {
-        expect(endpoint.path.startsWith('/finance-m2m/:profileId')).toBe(true);
         expect(endpoint.request.profileId).toBeDefined();
+        for (const operation of endpoint.operations) {
+          expect(operation.whenToUse.length).toBeGreaterThan(10);
+          expect(operation.params.length).toBeGreaterThan(0);
+          expect(typeof operation.example).toBe('object');
+        }
       }
     }
   });
