@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Alert } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { EmptyState } from '../../components/ui/empty-state';
+import { IconCheck, IconLayers } from '../../components/ui/icons';
+import { PageHeader } from '../../components/ui/page-header';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyProfile } from '../../hooks/use-my-profile';
 import { formatCurrencyBRL } from '../../lib/format';
@@ -12,8 +15,10 @@ function planFeatures(plan: Plan): string[] {
   return [
     `Até ${plan.limit} mensagens por mês`,
     'Lembretes únicos e recorrentes',
-    'Conexão direta com o WhatsApp',
-    'Contexto pessoal para a IA',
+    'Controle de gastos, contas fixas e metas',
+    'Carteira de investimentos',
+    'Categorização automática por regras',
+    'Tudo direto no WhatsApp',
   ];
 }
 
@@ -47,26 +52,21 @@ export function PlansPage() {
   }, []);
 
   return (
-    <>
-      <div className="page-head">
-        <span className="eyebrow">Planos</span>
-        <h2>Escolha seu ritmo</h2>
-        <p>
-          Todos os planos incluem o Jarvis completo no WhatsApp — o que muda é
-          o volume de mensagens. A troca de plano estará disponível em breve.
-        </p>
-        <span className="sunset-bar" aria-hidden="true" />
-      </div>
+    <div className="page">
+      <PageHeader
+        eyebrow="Planos"
+        title="Escolha seu ritmo"
+        description="Todos os planos incluem o Jarvis completo no WhatsApp. O que muda é o volume de mensagens por mês. A troca de plano estará disponível em breve."
+      />
 
       {error ? (
         <Alert variant="error">{error}</Alert>
       ) : !plans ? (
         <Spinner page />
       ) : plans.length === 0 ? (
-        <div className="event-empty">
-          <strong>Nenhum plano disponível</strong>
-          Volte em breve — estamos preparando as opções.
-        </div>
+        <EmptyState icon={<IconLayers />} title="Nenhum plano disponível">
+          Volte em breve. Estamos preparando as opções.
+        </EmptyState>
       ) : (
         <div className="plans-grid">
           {plans.map((plan) => {
@@ -81,7 +81,7 @@ export function PlansPage() {
               >
                 <header className="plan-card__head">
                   <h3 className="card__title">{plan.name}</h3>
-                  {isCurrent ? <Badge variant="accent">Atual</Badge> : null}
+                  {isCurrent ? <Badge variant="accent">Seu plano</Badge> : null}
                 </header>
                 <div className="plan-price">
                   <span className="plan-price__value">
@@ -93,13 +93,16 @@ export function PlansPage() {
                 </div>
                 <ul className="plan-features">
                   {planFeatures(plan).map((feature) => (
-                    <li key={feature}>{feature}</li>
+                    <li key={feature}>
+                      <IconCheck />
+                      {feature}
+                    </li>
                   ))}
                 </ul>
                 <div className="plan-card__cta">
                   {isCurrent ? (
                     <Button variant="ghost" block disabled>
-                      Seu plano atual
+                      Plano atual
                     </Button>
                   ) : (
                     <Button block disabled title="Troca de plano em breve">
@@ -112,6 +115,6 @@ export function PlansPage() {
           })}
         </div>
       )}
-    </>
+    </div>
   );
 }
