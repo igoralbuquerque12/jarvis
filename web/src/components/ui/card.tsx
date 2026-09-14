@@ -1,12 +1,16 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 
-export function Card({
-  className,
-  ...props
-}: HTMLAttributes<HTMLElement>) {
+interface CardProps extends HTMLAttributes<HTMLElement> {
+  /** Remove padding so lists/tables can bleed to the edges. */
+  flush?: boolean;
+}
+
+export function Card({ className, flush = false, ...props }: CardProps) {
   return (
     <section
-      className={['card', className].filter(Boolean).join(' ')}
+      className={['card', flush ? 'card--flush' : null, className]
+        .filter(Boolean)
+        .join(' ')}
       {...props}
     />
   );
@@ -25,7 +29,7 @@ export function CardHeader({ title, subtitle, aside }: CardHeaderProps) {
         <h3 className="card__title">{title}</h3>
         {subtitle ? <p className="card__subtitle">{subtitle}</p> : null}
       </div>
-      {aside}
+      {aside ? <div className="card__aside">{aside}</div> : null}
     </header>
   );
 }
