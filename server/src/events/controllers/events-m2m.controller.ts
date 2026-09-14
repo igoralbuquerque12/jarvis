@@ -28,7 +28,7 @@ export class EventsM2mController {
     @Param('profileId', ParseUUIDPipe) profileId: string,
     @Body() body: ExecuteOperationDto,
   ) {
-    const { operation, data } = body;
+    const { operation, data = {} } = body;
 
     const dataWithProfile = { ...data, profileId };
 
