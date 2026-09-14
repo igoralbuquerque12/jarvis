@@ -1,5 +1,15 @@
 import { useState } from 'react';
 import { Alert } from '../../../components/ui/alert';
+import { Badge } from '../../../components/ui/badge';
+import { Button, IconButton } from '../../../components/ui/button';
+import { Card, CardHeader } from '../../../components/ui/card';
+import { EmptyState } from '../../../components/ui/empty-state';
+import {
+  IconTag,
+  IconTrash,
+  IconWallet,
+} from '../../../components/ui/icons';
+import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyAccounts } from '../../../hooks/use-my-accounts';
 import { useMyCategories } from '../../../hooks/use-my-categories';
@@ -10,45 +20,74 @@ import {
   deleteMyRule,
 } from '../../../services/finance.service';
 import type { FinanceCategory, Rule } from '../../../types/api';
+import { Amount } from '../components/amount';
 
-// ── Accounts Tab ──────────────────────────────────────────────────────────────
+// ── Accounts ──────────────────────────────────────────────────────────────────
 
-function AccountsTab() {
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  checking: 'Conta corrente',
+  savings: 'Poupança',
+  credit_card: 'Cartão de crédito',
+  cash: 'Dinheiro',
+  investment: 'Investimento',
+  wallet: 'Carteira',
+};
+
+function AccountsCard() {
   const { accounts, loading, error } = useMyAccounts();
 
-  if (loading) return <Spinner />;
-  if (error) return <Alert variant="error">{error}</Alert>;
-
   return (
-    <div>
-      {accounts.length === 0 ? (
-        <div className="event-empty">
-          <strong>Nenhuma conta</strong>
-          <p>A conta padrão "Carteira" é criada automaticamente pelo Jarvis.</p>
+    <Card>
+      <CardHeader
+        title="Contas"
+        subtitle="Onde o dinheiro entra e sai."
+        aside={accounts.length > 0 ? <Badge variant="neutral">{accounts.length}</Badge> : undefined}
+      />
+      {loading ? (
+        <div className="spinner-wrap">
+          <Spinner />
         </div>
+      ) : error ? (
+        <Alert variant="error">{error}</Alert>
+      ) : accounts.length === 0 ? (
+        <EmptyState icon={<IconWallet />} title="Nenhuma conta">
+          A conta padrão é criada automaticamente pelo Jarvis.
+        </EmptyState>
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {accounts.map((a) => (
-            <li key={a.id} className="tx-row">
-              <div className="tx-row__body">
-                <span className="tx-row__description">{a.name}</span>
-                <span className="tx-row__meta">
-                  {a.type} · {a.currency}
-                  {a.institution && ` · ${a.institution}`}
-                  {a.isDefault && ' · Padrão'}
+        <ul className="simple-list">
+          {accounts.map((account) => (
+            <li key={account.id}>
+              <span className="simple-list__icon" aria-hidden="true">
+                {account.icon ? account.icon : <IconWallet />}
+              </span>
+              <div className="simple-list__body">
+                <span className="simple-list__title">
+                  {account.name}
+                  {account.isDefault ? (
+                    <Badge variant="accent">Padrão</Badge>
+                  ) : null}
+                </span>
+                <span className="simple-list__meta">
+                  {[
+                    ACCOUNT_TYPE_LABELS[account.type] ?? account.type,
+                    account.institution,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               </div>
+              <Amount value={account.balance} currency={account.currency} colored />
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 
-// ── Categories Tab ─────────────────────────────────────────────────────────────
+// ── Categories ────────────────────────────────────────────────────────────────
 
-function CategoryRow({
+function CategoryItem({
   category,
   onDelete,
 }: {
@@ -56,195 +95,201 @@ function CategoryRow({
   onDelete: () => void;
 }) {
   return (
-    <li className="tx-row">
-      {category.icon && <span style={{ fontSize: '1.1rem' }}>{category.icon}</span>}
-      <div className="tx-row__body">
-        <span className="tx-row__description">{category.name}</span>
-        {category.isDefault && (
-          <span className="badge badge--neutral" style={{ marginLeft: 0 }}>padrão</span>
-        )}
+    <li>
+      <span className="simple-list__icon" aria-hidden="true">
+        {category.icon ? category.icon : <IconTag />}
+      </span>
+      <div className="simple-list__body">
+        <span className="simple-list__title">{category.name}</span>
+        {category.isDefault ? (
+          <span className="simple-list__meta">Categoria padrão</span>
+        ) : null}
       </div>
-      {!category.isDefault && (
-        <button
-          type="button"
-          className="btn btn--danger btn--sm"
-          onClick={onDelete}
-        >
-          ×
-        </button>
-      )}
+      {!category.isDefault ? (
+        <IconButton label="Excluir categoria" danger onClick={onDelete}>
+          <IconTrash />
+        </IconButton>
+      ) : null}
     </li>
   );
 }
 
-function CategoriesTab() {
+function CategoriesCard() {
   const { categories, loading, error, reload } = useMyCategories();
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault();
     setSaving(true);
-    setErr(null);
+    setFormError(null);
     try {
-      await createMyCategory({ name, icon: icon || undefined });
+      await createMyCategory({ name: name.trim(), icon: icon.trim() || undefined });
       setName('');
       setIcon('');
       reload();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Erro ao criar.');
+    } catch (createError: unknown) {
+      setFormError(
+        createError instanceof Error ? createError.message : 'Erro ao criar.',
+      );
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Excluir categoria?')) return;
+    if (!window.confirm('Excluir categoria?')) return;
     await deleteMyCategory(id);
     reload();
   }
 
-  if (loading) return <Spinner />;
-  if (error) return <Alert variant="error">{error}</Alert>;
-
   return (
-    <div>
-      <form
-        onSubmit={(e) => void handleCreate(e)}
-        style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'flex-end' }}
-      >
-        <div className="field" style={{ flex: 1, marginTop: 0 }}>
-          <label className="label" htmlFor="cat-name">Nova categoria</label>
-          <input id="cat-name" className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ex: Pets" />
-        </div>
-        <div className="field" style={{ width: 80, marginTop: 0 }}>
-          <label className="label" htmlFor="cat-icon">Emoji</label>
-          <input id="cat-icon" className="input" value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🐾" maxLength={4} />
-        </div>
-        <button type="submit" className="btn btn--primary" disabled={saving} style={{ flexShrink: 0 }}>
-          {saving ? '…' : 'Criar'}
-        </button>
-      </form>
-      {err && <div className="alert alert--error" style={{ marginBottom: 12 }}>{err}</div>}
-      <ul className="tx-list">
-        {categories.map((c) => (
-          <CategoryRow
-            key={c.id}
-            category={c}
-            onDelete={() => void handleDelete(c.id)}
+    <Card>
+      <CardHeader
+        title="Categorias"
+        subtitle="Como os lançamentos são agrupados."
+        aside={categories.length > 0 ? <Badge variant="neutral">{categories.length}</Badge> : undefined}
+      />
+      <form className="inline-form" onSubmit={(event) => void handleCreate(event)}>
+        <div className="field field--emoji">
+          <label className="label" htmlFor="cat-icon">
+            Ícone
+          </label>
+          <input
+            id="cat-icon"
+            className="input"
+            value={icon}
+            onChange={(event) => setIcon(event.target.value)}
+            placeholder="🐾"
+            maxLength={4}
           />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ── Rules Tab ─────────────────────────────────────────────────────────────────
-
-function RuleItem({ rule, onDelete }: { rule: Rule; onDelete: () => void }) {
-  return (
-    <li className="tx-row" style={{ alignItems: 'center' }}>
-      <div className="tx-row__body">
-        <span className="tx-row__description">{rule.name}</span>
-        <span className="tx-row__meta">
-          Prioridade {rule.priority}
-          {' · '}
-          {rule.conditions.length} condição{rule.conditions.length !== 1 ? 'ões' : ''}
-          {' · '}
-          {rule.actions.length} ação{rule.actions.length !== 1 ? 'ões' : ''}
-        </span>
-      </div>
-      <span className={`badge ${rule.isActive ? 'badge--success' : 'badge--neutral'}`}>
-        {rule.isActive ? 'ativa' : 'inativa'}
-      </span>
-      <button type="button" className="btn btn--danger btn--sm" onClick={onDelete}>×</button>
-    </li>
-  );
-}
-
-function RulesTab() {
-  const { rules, loading, error, reload } = useMyRules();
-
-  async function handleDelete(id: string) {
-    if (!confirm('Excluir esta regra de categorização?')) return;
-    await deleteMyRule(id);
-    reload();
-  }
-
-  if (loading) return <Spinner />;
-  if (error) return <Alert variant="error">{error}</Alert>;
-
-  return (
-    <div>
-      <p className="muted" style={{ fontSize: '0.88rem', marginBottom: 16 }}>
-        As regras categorizam transações automaticamente. Para criar regras, use o assistente via WhatsApp.
-      </p>
-      {rules.length === 0 ? (
-        <div className="event-empty">
-          <strong>Nenhuma regra</strong>
-          <p>Peça ao Jarvis para criar uma regra de categorização.</p>
         </div>
+        <div className="field field--grow">
+          <label className="label" htmlFor="cat-name">
+            Nova categoria
+          </label>
+          <input
+            id="cat-name"
+            className="input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+            placeholder="Ex.: Pets"
+          />
+        </div>
+        <Button type="submit" disabled={saving}>
+          {saving ? '…' : 'Criar'}
+        </Button>
+      </form>
+      {formError ? (
+        <div style={{ marginBottom: 12 }}>
+          <Alert variant="error">{formError}</Alert>
+        </div>
+      ) : null}
+      {loading ? (
+        <div className="spinner-wrap">
+          <Spinner />
+        </div>
+      ) : error ? (
+        <Alert variant="error">{error}</Alert>
       ) : (
-        <ul className="tx-list">
-          {rules.map((r) => (
-            <RuleItem
-              key={r.id}
-              rule={r}
-              onDelete={() => void handleDelete(r.id)}
+        <ul className="simple-list">
+          {categories.map((category) => (
+            <CategoryItem
+              key={category.id}
+              category={category}
+              onDelete={() => void handleDelete(category.id)}
             />
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Rules ─────────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'accounts' | 'categories' | 'rules';
-
-export function FinanceSettingsPage() {
-  const [tab, setTab] = useState<SettingsTab>('accounts');
-
-  const TABS: { id: SettingsTab; label: string }[] = [
-    { id: 'accounts', label: 'Contas' },
-    { id: 'categories', label: 'Categorias' },
-    { id: 'rules', label: 'Regras' },
-  ];
+function RuleItem({ rule, onDelete }: { rule: Rule; onDelete: () => void }) {
+  const conditions = rule.conditions.length;
+  const actions = rule.actions.length;
 
   return (
-    <>
-      <div className="page-head">
-        <span className="eyebrow">Configurações</span>
-        <h2>Finanças</h2>
-        <p>Gerencie contas, categorias e regras de categorização.</p>
-        <span className="sunset-bar" aria-hidden="true" />
+    <li>
+      <div className="simple-list__body">
+        <span className="simple-list__title">{rule.name}</span>
+        <span className="simple-list__meta">
+          Prioridade {rule.priority} · {conditions}{' '}
+          {conditions === 1 ? 'condição' : 'condições'} · {actions}{' '}
+          {actions === 1 ? 'ação' : 'ações'}
+        </span>
       </div>
+      <Badge variant={rule.isActive ? 'success' : 'neutral'}>
+        {rule.isActive ? 'Ativa' : 'Inativa'}
+      </Badge>
+      <IconButton label="Excluir regra" danger onClick={onDelete}>
+        <IconTrash />
+      </IconButton>
+    </li>
+  );
+}
 
-      <div className="card">
-        {/* Inner tab switcher */}
-        <div
-          className="auth__switch"
-          style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 24 }}
-        >
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className="auth__switch-btn"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+function RulesCard() {
+  const { rules, loading, error, reload } = useMyRules();
+
+  async function handleDelete(id: string) {
+    if (!window.confirm('Excluir esta regra de categorização?')) return;
+    await deleteMyRule(id);
+    reload();
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Regras automáticas"
+        subtitle="Categorizam lançamentos sozinhas. Para criar uma, peça ao Jarvis no WhatsApp."
+        aside={rules.length > 0 ? <Badge variant="neutral">{rules.length}</Badge> : undefined}
+      />
+      {loading ? (
+        <div className="spinner-wrap">
+          <Spinner />
         </div>
+      ) : error ? (
+        <Alert variant="error">{error}</Alert>
+      ) : rules.length === 0 ? (
+        <EmptyState icon={<IconTag />} title="Nenhuma regra">
+          Exemplo: «toda compra com "uber" vai para Transporte».
+        </EmptyState>
+      ) : (
+        <ul className="simple-list">
+          {rules.map((rule) => (
+            <RuleItem
+              key={rule.id}
+              rule={rule}
+              onDelete={() => void handleDelete(rule.id)}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
 
-        {tab === 'accounts' && <AccountsTab />}
-        {tab === 'categories' && <CategoriesTab />}
-        {tab === 'rules' && <RulesTab />}
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export function FinanceSettingsPage() {
+  return (
+    <>
+      <PageHeader
+        eyebrow="Finanças"
+        title="Contas, categorias e regras"
+        description="A estrutura por trás dos seus lançamentos."
+      />
+      <div className="cols cols--3">
+        <AccountsCard />
+        <CategoriesCard />
+        <RulesCard />
       </div>
     </>
   );
