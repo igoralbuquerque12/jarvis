@@ -1,29 +1,46 @@
 import type { ReactNode } from 'react';
+import {
+  IconBell,
+  IconBriefcase,
+  IconRepeat,
+  IconTag,
+  IconTarget,
+  IconWallet,
+} from '../../../components/ui/icons';
 import { Wordmark } from '../../../components/ui/wordmark';
 
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-      <path d="M12 3l7 3v5c0 4.4-2.9 8.2-7 10-4.1-1.8-7-5.6-7-10V6l7-3z" />
-    </svg>
-  );
-}
-
-function BoltIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />
-    </svg>
-  );
-}
-
-function ChatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-      <path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z" />
-    </svg>
-  );
-}
+const CAPABILITIES = [
+  {
+    icon: <IconBell />,
+    title: 'Lembretes e compromissos',
+    detail: 'Únicos ou recorrentes, na hora certa.',
+  },
+  {
+    icon: <IconWallet />,
+    title: 'Gastos e ganhos',
+    detail: 'Registre pelo chat, veja o saldo do mês.',
+  },
+  {
+    icon: <IconTag />,
+    title: 'Categorias automáticas',
+    detail: 'Regras que organizam seus lançamentos.',
+  },
+  {
+    icon: <IconRepeat />,
+    title: 'Contas fixas',
+    detail: 'Salário, aluguel, assinaturas.',
+  },
+  {
+    icon: <IconTarget />,
+    title: 'Metas de economia',
+    detail: 'Acompanhe o progresso de cada objetivo.',
+  },
+  {
+    icon: <IconBriefcase />,
+    title: 'Investimentos',
+    detail: 'Ações, cripto, renda fixa e imóveis.',
+  },
+];
 
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -31,38 +48,41 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <aside className="auth__panel">
         <Wordmark size="lg" tagline />
 
-        <div className="auth__tagline">
+        <div className="auth__hero">
           <span className="eyebrow">Assistente pessoal · WhatsApp</span>
           <h1>
-            Sua rotina, <em>no piloto automático</em>
+            Sua rotina e seu dinheiro <em>numa conversa</em>
           </h1>
           <p>
-            Converse com o Jarvis como conversa com qualquer contato — ele
-            anota, agenda e te lembra na hora certa.
+            Fale com o Jarvis como fala com qualquer contato. Ele agenda,
+            anota gastos, organiza contas e te avisa na hora certa.
           </p>
 
           <div className="chat-mock" aria-hidden="true">
             <div className="chat-bubble chat-bubble--user">
-              Jarvis, me lembra amanhã às 9h de pagar o boleto da internet
+              Gastei 86 no mercado agora e me lembra amanhã 9h de pagar a
+              internet
             </div>
             <div className="chat-bubble chat-bubble--jarvis">
               <span className="chat-bubble__sender">Jarvis</span>
-              Anotado! Te aviso amanhã às 09:00.
+              Anotado: R$ 86,00 em Alimentação. Seu saldo do mês está em
+              R$ 1.240,00.
               <br />
               <span className="chat-chip">Lembrete · amanhã 09:00</span>
             </div>
-            <div className="chat-bubble chat-bubble--typing">
-              <span />
-              <span />
-              <span />
-            </div>
           </div>
 
-          <div className="feature-chips">
-            <span className="feature-chip">Lembretes</span>
-            <span className="feature-chip">Rotinas recorrentes</span>
-            <span className="feature-chip">Contexto pessoal</span>
-          </div>
+          <ul className="capabilities">
+            {CAPABILITIES.map((item) => (
+              <li key={item.title}>
+                {item.icon}
+                <div>
+                  {item.title}
+                  <span>{item.detail}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <p className="auth__footnote">
@@ -74,32 +94,14 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="auth__form-side">
-        <span className="auth__watermark" aria-hidden="true">
-          Jarvis
-        </span>
-        <div className="auth__glow" aria-hidden="true" />
-        <div className="auth__dots" aria-hidden="true" />
-
         <div className="auth__form-col">
-          <span className="sunset-bar" aria-hidden="true" />
-          <div className="auth__form-card">{children}</div>
-          <ul className="trust-list">
-            <li>
-              <ShieldIcon />
-              Sessão criptografada
-            </li>
-            <li>
-              <BoltIcon />
-              Resposta em segundos
-            </li>
-            <li>
-              <ChatIcon />
-              Direto no seu WhatsApp
-            </li>
-          </ul>
-          <p className="auth__terminal">
-            &gt; jarvis pronto para conectar
-            <span className="auth__cursor" aria-hidden="true" />
+          <div className="auth__form-mobile-brand">
+            <Wordmark size="lg" />
+          </div>
+          {children}
+          <p className="auth__form-foot">
+            Ao entrar, você conecta o Jarvis ao seu WhatsApp em menos de um
+            minuto.
           </p>
         </div>
       </div>
