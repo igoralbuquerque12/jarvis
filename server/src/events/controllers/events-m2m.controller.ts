@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { WhatsappAdminGuard } from '../../whatsapp/guards/whatsapp-admin.guard';
+import { AssistantToolGuard } from '../../assistant/guards/assistant-tool.guard';
 import { ExecuteOperationDto } from '../../core/dto/execute-operation.dto';
 
 import { EventsM2mService } from '../services/events-m2m.service';
@@ -18,7 +18,7 @@ import { FindActiveEventsDto } from '../dto/find-active-events.dto';
 
 import { validateDto } from '../../core/utils/validate-dto.util';
 
-@UseGuards(WhatsappAdminGuard)
+@UseGuards(AssistantToolGuard)
 @Controller('events-m2m')
 export class EventsM2mController {
   constructor(private readonly eventsM2mService: EventsM2mService) {}
