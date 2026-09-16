@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
 import { ProfileModule } from '../profile/profile.module';
+import { AssistantToolGuard } from '../assistant/guards/assistant-tool.guard';
 
 import { FinanceM2mController } from './controllers/finance-m2m.controller';
 
@@ -31,7 +32,10 @@ import { SecuroContextService } from './core/services/securo-context.service';
 import { SecuroProvisioningService } from './core/services/securo-provisioning.service';
 
 @Module({
-  imports: [forwardRef(() => AuthModule), forwardRef(() => ProfileModule)],
+  imports: [
+    forwardRef(() => AuthModule),
+    forwardRef(() => ProfileModule),
+  ],
   controllers: [
     FinanceM2mController,
     AccountsController,
@@ -43,6 +47,7 @@ import { SecuroProvisioningService } from './core/services/securo-provisioning.s
     AssetsController,
   ],
   providers: [
+    AssistantToolGuard,
     SecuroApiService,
     SecuroContextService,
     SecuroProvisioningService,

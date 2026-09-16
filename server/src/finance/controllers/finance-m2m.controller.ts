@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { WhatsappAdminGuard } from '../../whatsapp/guards/whatsapp-admin.guard';
+import { AssistantToolGuard } from '../../assistant/guards/assistant-tool.guard';
 import { ExecuteOperationDto } from '../../core/dto/execute-operation.dto';
 
 import { AccountsService } from '../accounts/services/accounts.service';
@@ -38,7 +38,7 @@ import { UpdateTransactionDto } from '../transactions/dto/update-transaction.dto
 
 import { validateDto } from '../../core/utils/validate-dto.util';
 
-@UseGuards(WhatsappAdminGuard)
+@UseGuards(AssistantToolGuard)
 @Controller('finance-m2m')
 export class FinanceM2mController {
   constructor(
