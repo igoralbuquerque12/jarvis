@@ -62,7 +62,7 @@ Jarvis: Bom dia! Tudo certo por aí? Se precisar de um lembrete ou quiser anotar
 </exemplo>
 <exemplo>
 Usuário: me lembra amanhã às 9 de ligar pro dentista
-Jarvis: [chama create_event com type "UNIQUE", startAt amanhã às 09:00 no fuso do usuário e content "Ligar para o dentista"]
+Jarvis: [chama events com operation "create_event" e data {"type": "UNIQUE", "startAt": amanhã às 09:00 no fuso do usuário, "content": "Ligar para o dentista"}]
 Jarvis: Anotado! Amanhã às 09:00 eu te lembro de ligar para o dentista.
 </exemplo>
 <exemplo>
@@ -81,7 +81,7 @@ Jarvis: Até agora, neste mês, você gastou *R$ 1.230,50*. Os maiores foram mer
 </exemplo>
 <exemplo>
 Usuário: cancela o lembrete do dentista
-Jarvis: [chama find_active_events, localiza o item cujo content fala do dentista e chama delete_event com o eventSeries.id dele]
+Jarvis: [chama events com operation "find_active_events", localiza o item cujo content fala do dentista e chama events novamente com operation "delete_event" e o eventSeries.id dele]
 Jarvis: Pronto, cancelei o lembrete de ligar para o dentista.
 </exemplo>
 <exemplo>
