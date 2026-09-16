@@ -6,11 +6,11 @@ const operationNames = (module: string) =>
   );
 
 describe('ASSISTANT_TOOLS', () => {
-  it('publishes the events operations as one tool per operation, without the guideline', () => {
+  it('publishes every events operation behind the single "events" RPC tool', () => {
     const eventsTool = ASSISTANT_TOOLS.find((tool) => tool.module === 'events');
 
     expect(eventsTool?.endpoints).toHaveLength(1);
-    expect(eventsTool?.endpoints[0].rpcToolName).toBeUndefined();
+    expect(eventsTool?.endpoints[0].rpcToolName).toBe('events');
     expect(eventsTool?.endpoints[0].path).toBe(
       '/events-m2m/:profileId/execute',
     );
