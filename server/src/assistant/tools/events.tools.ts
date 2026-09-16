@@ -48,6 +48,7 @@ export const EVENTS_TOOL: AssistantTool = {
         data: 'Objeto com os campos da operação (ver operações).',
       },
       response: 'Resultado da operação.',
+      rpcToolName: 'events',
       operations: [
         {
           name: 'create_event',
