@@ -40,9 +40,10 @@ describe('renderToolsReference', () => {
     }
   });
 
-  it('explains the RPC exposure for finance and the per-operation tools for events', () => {
+  it('explains the RPC exposure for finance and events', () => {
     expect(reference).toContain('Ferramenta única: "finance"');
-    expect(reference).toContain('Uma ferramenta por operação');
+    expect(reference).toContain('Ferramenta única: "events"');
+    expect(reference).toContain('operation="create_event"');
     expect(reference).toContain('operation="create_transaction"');
   });
 });
