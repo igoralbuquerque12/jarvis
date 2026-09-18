@@ -4,6 +4,7 @@ import {
   buildTemporalContext,
   renderToolsReference,
 } from './build-system-prompt';
+import { buildToolSchemas } from './build-tool-schemas';
 
 describe('buildTemporalContext', () => {
   const reference = new Date('2026-09-10T17:30:00.000Z');
@@ -29,33 +30,94 @@ describe('buildTemporalContext', () => {
 describe('renderToolsReference', () => {
   const reference = renderToolsReference(ASSISTANT_TOOLS);
 
-  it('documents every operation of every module', () => {
+  it('documents every tool and every operation', () => {
     for (const tool of ASSISTANT_TOOLS) {
-      expect(reference).toContain(`## Módulo ${tool.module}`);
-      for (const endpoint of tool.endpoints) {
-        for (const operation of endpoint.operations) {
-          expect(reference).toContain(`### ${operation.name}`);
-        }
+      expect(reference).toContain(`## Ferramenta "${tool.name}"`);
+      for (const operation of tool.operations) {
+        expect(reference).toContain(`### ${operation.name}`);
+        expect(reference).toContain(`operation="${operation.name}"`);
       }
     }
   });
 
-  it('explains the RPC exposure for finance and events', () => {
-    expect(reference).toContain('Ferramenta única: "finance"');
-    expect(reference).toContain('Ferramenta única: "events"');
-    expect(reference).toContain('operation="create_event"');
-    expect(reference).toContain('operation="create_transaction"');
+  it('renders typed field lines', () => {
+    expect(reference).toContain(
+      '- type ("UNIQUE" | "RECURRENCE", obrigatório)',
+    );
+    expect(reference).toContain('- date (string "YYYY-MM-DD", obrigatório)');
+    expect(reference).toContain('- eventSeriesId (uuid, obrigatório)');
+    expect(reference).toContain('Campos: nenhum; envie data={}.');
   });
 });
 
 describe('buildDirective', () => {
-  it('starts with the role section and ends with the tools reference', () => {
-    const directive = buildDirective(ASSISTANT_TOOLS);
+  const directive = buildDirective(ASSISTANT_TOOLS);
 
+  it('starts with the role and ends with the tools reference', () => {
     expect(directive.startsWith('# Papel e objetivo')).toBe(true);
-    expect(directive).toContain('# Ferramentas disponíveis');
     expect(directive.indexOf('# Exemplos')).toBeLessThan(
       directive.indexOf('# Ferramentas disponíveis'),
     );
+  });
+
+  it('contains the behaviour contract sections exactly once', () => {
+    for (const section of [
+      '# Fontes de verdade',
+      '# Regras de operação',
+      '# Ferramentas e erros',
+      '# Autonomia e confirmação',
+      '# Quando perguntar',
+      '# Critérios de conclusão',
+      '# Formato da resposta',
+    ]) {
+      expect(directive.split(section).length - 1).toBe(1);
+    }
+  });
+
+  it('documents every error code the M2M filter can emit', () => {
+    for (const code of [
+      'validation_error',
+      'not_found',
+      'unsupported_operation',
+      'conflict',
+      'unavailable',
+      'internal_error',
+    ]) {
+      expect(directive).toContain(code);
+    }
+  });
+});
+
+describe('buildToolSchemas', () => {
+  const schemas = buildToolSchemas(ASSISTANT_TOOLS);
+
+  it('produces one schema per tool with the operation enum', () => {
+    expect(schemas.map((schema) => schema.name)).toEqual(
+      ASSISTANT_TOOLS.map((tool) => tool.name),
+    );
+
+    const events = schemas.find((schema) => schema.name === 'events');
+    const properties = events?.schema.properties as Record<string, unknown>;
+    const operation = properties.operation as { enum: string[] };
+
+    expect(operation.enum).toEqual([
+      'create_event',
+      'find_active_events',
+      'delete_event',
+    ]);
+  });
+
+  it('merges fields shared by several operations', () => {
+    const transactions = schemas.find(
+      (schema) => schema.name === 'transactions',
+    );
+    const properties = transactions?.schema.properties as Record<
+      string,
+      { properties: Record<string, { description: string }> }
+    >;
+    const amount = properties.data.properties.amount;
+
+    expect(amount.description).toContain('create_transaction: obrigatório');
+    expect(amount.description).toContain('update_transaction: opcional');
   });
 });
