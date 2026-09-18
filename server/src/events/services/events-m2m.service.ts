@@ -13,10 +13,15 @@ import {
 } from '../constants/events-cache.constant';
 import { CreateEventDto } from '../dto/create-event.dto';
 import { FindActiveEventsDto } from '../dto/find-active-events.dto';
-import { getEventsGuideline } from '../utils/get-events-guideline';
 import { parseAndNormalizeStartAt } from '../utils/get-next-scheduled-at';
 import { EventExecutionService } from './event-execution.service';
 import { EventSeriesService } from './event-series.service';
+
+/** ISO-8601 with offset in the profile timezone, ready to be read back to the user. */
+function toLocalIso(date: Date, timezone: string): string {
+  const dt = DateTime.fromJSDate(date).setZone(timezone);
+  return dt.toISO({ suppressMilliseconds: true }) ?? date.toISOString();
+}
 
 @Injectable()
 export class EventsM2mService {
@@ -60,11 +65,27 @@ export class EventsM2mService {
       await this.redisService.getClient().del(EVENTS_SCHEDULE_CACHE_KEY);
     }
 
-    return { eventSeries, eventExecution };
+    // scheduledAtLocal is what the assistant must read back to the user:
+    // it already reflects the 10-minute rounding and the profile timezone.
+    return {
+      eventSeries,
+      eventExecution,
+      scheduledAtLocal: toLocalIso(scheduledAt, profile.timezone),
+    };
   }
 
-  async deleteEvent(eventSeriesId: string) {
-    await this.eventSeriesService.findOne(eventSeriesId);
+  /**
+   * Deactivates a series and cancels its pending executions.
+   * A series that exists but belongs to another profile is reported as not
+   * found, so the caller learns nothing about it.
+   */
+  async deleteEvent(profileId: string, eventSeriesId: string) {
+    const series = await this.eventSeriesService.findOne(eventSeriesId);
+
+    if (series.profileId !== profileId) {
+      throw new NotFoundException(`Event series ${eventSeriesId} not found`);
+    }
+
     const eventSeries = await this.eventSeriesService.update(eventSeriesId, {
       active: false,
     });
@@ -96,16 +117,17 @@ export class EventsM2mService {
       scheduledAtEnd = start.plus({ days: 1 }).toUTC().toJSDate();
     }
 
-    return this.eventExecutionService.findActive({
+    const executions = await this.eventExecutionService.findActive({
       profileId: filters.profileId,
       type: filters.type,
       scheduledAtStart,
       scheduledAtEnd,
     });
-  }
 
-  getGuideline() {
-    return { directive: getEventsGuideline() };
+    return executions.map((execution) => ({
+      ...execution,
+      scheduledAtLocal: toLocalIso(execution.scheduledAt, profile.timezone),
+    }));
   }
 
   private validateRecurrence(data: CreateEventDto) {
