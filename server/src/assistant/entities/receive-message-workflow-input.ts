@@ -1,5 +1,5 @@
 import type { Message } from '@prisma/client';
-import type { AssistantTool } from '../tools/events.tools';
+import type { AssistantTool } from '../tools/tool.types';
 
 export type WorkflowHistoryMessage = Pick<
   Message,
