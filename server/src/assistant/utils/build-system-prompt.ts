@@ -3,9 +3,9 @@ import { DateTime } from 'luxon';
 import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import type {
   AssistantTool,
-  AssistantToolEndpoint,
-  AssistantToolOperation,
-} from '../tools/events.tools';
+  ToolField,
+  ToolOperation,
+} from '../tools/tool.types';
 
 export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 
@@ -37,21 +37,44 @@ export function buildTemporalContext(
   };
 }
 
-function renderOperation(
-  operation: AssistantToolOperation,
-  endpoint: AssistantToolEndpoint,
-): string[] {
-  const example = endpoint.rpcToolName
-    ? `operation="${operation.name}", data=${JSON.stringify(operation.example)}`
-    : JSON.stringify(operation.example);
+function typeLabel(field: ToolField): string {
+  if (field.enum) {
+    return field.enum.map((value) => `"${value}"`).join(' | ');
+  }
+  switch (field.format) {
+    case 'uuid':
+      return 'uuid';
+    case 'date':
+      return 'string "YYYY-MM-DD"';
+    case 'date-time':
+      return 'string ISO-8601 com offset';
+    case 'color':
+      return 'string "#RRGGBB"';
+    default:
+      return field.type;
+  }
+}
 
+function renderField(field: ToolField): string {
+  const requirement = field.required ? 'obrigatório' : 'opcional';
+  return `- ${field.name} (${typeLabel(field)}, ${requirement}): ${field.description}`;
+}
+
+function renderOperation(operation: ToolOperation): string[] {
   const lines = [
     `### ${operation.name}`,
     `Quando usar: ${operation.whenToUse}`,
-    'Campos:',
-    ...operation.params.map((param) => `- ${param}`),
-    `Exemplo: ${example}`,
   ];
+
+  if (operation.fields.length === 0) {
+    lines.push('Campos: nenhum; envie data={}.');
+  } else {
+    lines.push('Campos:', ...operation.fields.map(renderField));
+  }
+
+  lines.push(
+    `Exemplo: operation="${operation.name}", data=${JSON.stringify(operation.example)}`,
+  );
 
   if (operation.notes) {
     lines.push(`Observação: ${operation.notes}`);
@@ -60,30 +83,25 @@ function renderOperation(
   return lines;
 }
 
-function renderEndpoint(endpoint: AssistantToolEndpoint): string[] {
-  const exposure = endpoint.rpcToolName
-    ? `Ferramenta única: "${endpoint.rpcToolName}", com os campos "operation" (nome exato da operação) e "data" (os campos da operação como um objeto JSON serializado em string; use "{}" quando não houver parâmetros).`
-    : 'Uma ferramenta por operação, com o mesmo nome da operação e os campos listados abaixo.';
+function renderTool(tool: AssistantTool): string {
+  const lines = [
+    `## Ferramenta "${tool.name}": ${tool.description}`,
+    `Quando usar: ${tool.whenToUse}`,
+    `Operações: ${tool.operations.map((operation) => operation.name).join(', ')}.`,
+  ];
 
-  const lines = [exposure, `Quando usar: ${endpoint.whenToUse}`];
-  for (const operation of endpoint.operations) {
-    lines.push('', ...renderOperation(operation, endpoint));
+  for (const operation of tool.operations) {
+    lines.push('', ...renderOperation(operation));
   }
-  return lines;
+
+  return lines.join('\n');
 }
 
 export function renderToolsReference(tools: AssistantTool[]): string {
-  const sections = tools.map((tool) =>
-    [
-      `## Módulo ${tool.module}: ${tool.description}`,
-      ...tool.endpoints.flatMap((endpoint) => renderEndpoint(endpoint)),
-    ].join('\n'),
-  );
-
   return [
     '# Ferramentas disponíveis',
-    'Use os nomes e os campos exatamente como descritos. Omita campos opcionais que não se aplicam. Quando uma operação precisar de um id, obtenha-o primeiro com a operação de listagem correspondente.',
-    ...sections,
+    'Toda ferramenta recebe "operation" (nome exato de uma das operações dela) e "data" (objeto com os campos da operação; {} quando não houver). Omita campos opcionais que não se aplicam. Quando uma operação precisar de um id, obtenha-o antes com a operação de listagem da mesma ferramenta. Nunca use uma operação em uma ferramenta que não a lista.',
+    ...tools.map(renderTool),
   ].join('\n\n');
 }
 
