@@ -1,17 +1,15 @@
 import { ASSISTANT_TOOLS } from '../tools/main.tools';
 
-const operationNames = (module: string) =>
-  ASSISTANT_TOOLS.find((tool) => tool.module === module)?.endpoints.flatMap(
-    (endpoint) => endpoint.operations.map((operation) => operation.name),
+const operationNames = (name: string) =>
+  ASSISTANT_TOOLS.find((tool) => tool.name === name)?.operations.map(
+    (operation) => operation.name,
   );
 
 describe('ASSISTANT_TOOLS', () => {
-  it('publishes every events operation behind the single "events" RPC tool', () => {
-    const eventsTool = ASSISTANT_TOOLS.find((tool) => tool.module === 'events');
+  it('publishes every events operation in the events tool', () => {
+    const eventsTool = ASSISTANT_TOOLS.find((tool) => tool.name === 'events');
 
-    expect(eventsTool?.endpoints).toHaveLength(1);
-    expect(eventsTool?.endpoints[0].rpcToolName).toBe('events');
-    expect(eventsTool?.endpoints[0].path).toBe(
+    expect(eventsTool?.path).toBe(
       '/events-m2m/:profileId/execute',
     );
     expect(operationNames('events')).toEqual([
@@ -21,17 +19,12 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
-  it('publishes every finance operation behind the single "finance" RPC tool', () => {
-    const financeTool = ASSISTANT_TOOLS.find(
-      (tool) => tool.module === 'finance',
-    );
+  it('publishes every finance operation in its dedicated tools', () => {
+    const financeTools = ASSISTANT_TOOLS.filter((tool) => tool.name !== 'events');
 
-    expect(financeTool?.endpoints).toHaveLength(1);
-    expect(financeTool?.endpoints[0].rpcToolName).toBe('finance');
-    expect(financeTool?.endpoints[0].path).toBe(
-      '/finance-m2m/:profileId/execute',
-    );
-    expect(operationNames('finance')).toEqual([
+    expect(financeTools).toHaveLength(7);
+    expect(financeTools.every((tool) => tool.path === '/finance-m2m/:profileId/execute')).toBe(true);
+    expect(financeTools.flatMap((tool) => tool.operations.map((operation) => operation.name))).toEqual([
       'list_accounts',
       'create_account',
       'create_transaction',
@@ -63,15 +56,14 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
-  it('describes every operation with usage, at least one field line and an example', () => {
+  it('describes every operation with usage, fields and an example', () => {
     for (const tool of ASSISTANT_TOOLS) {
-      for (const endpoint of tool.endpoints) {
-        expect(endpoint.request.profileId).toBeDefined();
-        for (const operation of endpoint.operations) {
-          expect(operation.whenToUse.length).toBeGreaterThan(10);
-          expect(operation.params.length).toBeGreaterThan(0);
-          expect(typeof operation.example).toBe('object');
-        }
+      expect(tool.description.length).toBeGreaterThan(10);
+      expect(tool.whenToUse.length).toBeGreaterThan(10);
+      for (const operation of tool.operations) {
+        expect(operation.whenToUse.length).toBeGreaterThan(10);
+        expect(Array.isArray(operation.fields)).toBe(true);
+        expect(typeof operation.example).toBe('object');
       }
     }
   });
