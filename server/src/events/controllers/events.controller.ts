@@ -2,7 +2,6 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Req,
@@ -11,7 +10,6 @@ import type { Request } from 'express';
 import { BetterAuthService } from '../../auth/services/better-auth.service';
 import { ProfileService } from '../../profile/services/profile.service';
 import { EventExecutionService } from '../services/event-execution.service';
-import { EventSeriesService } from '../services/event-series.service';
 import { EventsM2mService } from '../services/events-m2m.service';
 
 @Controller('events')
@@ -19,7 +17,6 @@ export class EventsController {
   constructor(
     private readonly authService: BetterAuthService,
     private readonly profileService: ProfileService,
-    private readonly eventSeriesService: EventSeriesService,
     private readonly eventExecutionService: EventExecutionService,
     private readonly eventsM2mService: EventsM2mService,
   ) {}
@@ -51,13 +48,11 @@ export class EventsController {
     @Param('seriesId', ParseUUIDPipe) seriesId: string,
   ) {
     const profile = await this.requireProfile(request);
-    const series = await this.eventSeriesService.findOne(seriesId);
-
-    if (series.profileId !== profile.id) {
-      throw new NotFoundException(`Event series ${seriesId} not found`);
-    }
-
-    const result = await this.eventsM2mService.deleteEvent(seriesId);
+    // Ownership is enforced inside deleteEvent (404 for foreign series).
+    const result = await this.eventsM2mService.deleteEvent(
+      profile.id,
+      seriesId,
+    );
 
     return { cancelledExecutions: result.cancelledExecutions };
   }
