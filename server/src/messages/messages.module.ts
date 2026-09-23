@@ -5,4 +5,4 @@ import { MessagesService } from './services/messages.service';
   providers: [MessagesService],
   exports: [MessagesService],
 })
-export class MessagesModule {}
+export class MessagesModule { }
