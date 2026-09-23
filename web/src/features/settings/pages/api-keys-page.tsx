@@ -6,6 +6,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { Field, TextInput } from '../../../components/ui/field';
+import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyApiKeys } from '../../../hooks/use-my-api-keys';
 import { useMyProfile } from '../../../hooks/use-my-profile';
@@ -190,7 +191,7 @@ function KeyListCard({
     body = (
       <div className="event-empty">
         <strong>Nenhuma chave ainda</strong>
-        <p>Crie a primeira ao lado para começar a integrar o Jarvis.</p>
+        <p>Crie a primeira chave abaixo para começar a integrar o Jarvis.</p>
       </div>
     );
   } else {
@@ -209,10 +210,11 @@ function KeyListCard({
   }
 
   return (
-    <Card>
+    <Card className="api-keys-list-card">
       <CardHeader
         title="Suas chaves"
         subtitle="Pause uma chave para bloquear o acesso sem perdê-la, ou exclua de vez."
+        aside={<Badge variant="neutral">{apiKeys.length}/{MAX_KEYS}</Badge>}
       />
       {actionError ? (
         <div style={{ marginBottom: 12 }}>
@@ -247,19 +249,13 @@ export function ApiKeysPage() {
   }
 
   return (
-    <>
-      <div className="page-head">
-        <span className="eyebrow">Configurações</span>
-        <h2>Chaves de API</h2>
-        <p>
-          Use o Jarvis a partir dos seus próprios sistemas. Cada chave
-          identifica você e permite que scripts e automações enviem mensagens
-          pelo assistente.
-        </p>
-        <span className="sunset-bar" aria-hidden="true" />
-      </div>
+    <div className="api-keys-page">
+      <PageHeader
+        title="Chaves de API"
+        description="Use o Jarvis a partir dos seus próprios sistemas. Cada chave identifica você e permite que scripts e automações enviem mensagens pelo assistente."
+      />
 
-      <div className="settings-grid">
+      <div className="api-keys-page__content">
         <KeyListCard
           apiKeys={apiKeys}
           loading={loading}
@@ -267,7 +263,7 @@ export function ApiKeysPage() {
           onChange={handleChange}
           onRemoved={handleRemoved}
         />
-        <div className="dash-grid__aside">
+        <div className="api-keys-page__support">
           <CreateKeyCard total={apiKeys.length} onCreated={handleCreated} />
           <HowItWorksCard whatsappLinked={profile?.whatsappLinked ?? true} />
         </div>
@@ -276,6 +272,6 @@ export function ApiKeysPage() {
       {created ? (
         <NewApiKeyModal apiKey={created} onClose={() => setCreated(null)} />
       ) : null}
-    </>
+    </div>
   );
 }
