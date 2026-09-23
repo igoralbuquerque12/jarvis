@@ -2769,15 +2769,29 @@ details summary {
    Chaves de API
    ------------------------------------------------------------ */
 
-.settings-grid {
+.api-keys-page {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 32px;
+}
+
+.api-keys-page__content {
+  display: grid;
+  gap: 24px;
+}
+
+.api-keys-page__support {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
   gap: 24px;
   align-items: start;
 }
 
-@media (max-width: 880px) {
-  .settings-grid {
+.api-keys-list-card .card__header {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .api-keys-page__support {
     grid-template-columns: 1fr;
   }
 }
