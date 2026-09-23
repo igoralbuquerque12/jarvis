@@ -72,4 +72,4 @@ import { SecuroProvisioningService } from './core/services/securo-provisioning.s
     AssetsService,
   ],
 })
-export class FinanceModule {}
+export class FinanceModule { }
