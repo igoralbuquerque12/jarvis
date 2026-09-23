@@ -9,7 +9,7 @@ export class RulesService {
   constructor(
     private readonly securoApi: SecuroApiService,
     private readonly securoContext: SecuroContextService,
-  ) {}
+  ) { }
 
   async findRules(profileId: string) {
     const context = await this.securoContext.contextFor(profileId);

@@ -22,7 +22,7 @@ export class RulesController {
     private readonly authService: BetterAuthService,
     private readonly profileService: ProfileService,
     private readonly rulesService: RulesService,
-  ) {}
+  ) { }
 
   @Get()
   async findMyRules(@Req() request: Request) {
