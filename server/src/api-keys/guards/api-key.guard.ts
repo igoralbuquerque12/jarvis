@@ -35,6 +35,7 @@ export class ApiKeyGuard implements CanActivate {
 
     this.apiKeysService.touchLastUsed(apiKey.id);
     request.apiKeyProfile = apiKey.profile;
+    request.apiKeyId = apiKey.id;
 
     return true;
   }
