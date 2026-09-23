@@ -83,6 +83,8 @@ export function DashboardPage() {
 
       <DashKpis events={events} timezone={profile.timezone} />
 
+      {!profile.whatsappLinked ? <WhatsappCard profile={profile} /> : null}
+
       <div className="cols">
         <div className="stack">
           <EventsCard
@@ -95,7 +97,6 @@ export function DashboardPage() {
           <DashChartCard />
         </div>
         <div className="stack">
-          <WhatsappCard profile={profile} />
           <DashGoalsCard />
           <SubscriptionCard profile={profile} />
         </div>
