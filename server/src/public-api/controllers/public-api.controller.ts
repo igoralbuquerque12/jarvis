@@ -1,5 +1,6 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import type { Profile } from '@prisma/client';
+import { ApiKeyId } from '../../api-keys/decorators/api-key-id.decorator';
 import { ApiKeyProfile } from '../../api-keys/decorators/api-key-profile.decorator';
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard';
 import { SendSelfMessageDto } from '../dto/send-self-message.dto';
@@ -16,9 +17,14 @@ export class PublicApiController {
 
   @Post('messages')
   sendMessage(
+    @ApiKeyId() apiKeyId: string,
     @ApiKeyProfile() profile: Profile,
     @Body() data: SendSelfMessageDto,
   ) {
-    return this.publicApiService.sendMessageToSelf(profile, data.message);
+    return this.publicApiService.sendMessageToSelf(
+      apiKeyId,
+      profile,
+      data.message,
+    );
   }
 }
