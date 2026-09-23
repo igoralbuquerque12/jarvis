@@ -235,6 +235,10 @@ export function ApiDocsPage() {
                       <td>Chave ausente, inválida ou pausada.</td>
                     </tr>
                     <tr>
+                      <td><code>429</code></td>
+                      <td>Mais de uma requisição com a mesma chave em um minuto.</td>
+                    </tr>
+                    <tr>
                       <td><code>409</code></td>
                       <td>Sua conta ainda não vinculou um número de WhatsApp.</td>
                     </tr>

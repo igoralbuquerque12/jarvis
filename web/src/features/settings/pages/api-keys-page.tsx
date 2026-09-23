@@ -60,11 +60,6 @@ function CreateKeyCard({
       <CardHeader
         title="Nova chave"
         subtitle="Dê um nome que identifique onde ela será usada."
-        aside={
-          <Badge variant={limitReached ? 'danger' : 'neutral'}>
-            {total}/{MAX_KEYS}
-          </Badge>
-        }
       />
       <form onSubmit={(event) => void handleSubmit(event)}>
         <Field label="Nome" hint="Ex.: Automação n8n, Script de deploy, Home Assistant.">
