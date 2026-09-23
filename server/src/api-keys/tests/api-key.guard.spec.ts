@@ -49,6 +49,7 @@ describe('ApiKeyGuard', () => {
     expect(apiKeysService.verify).toHaveBeenCalledWith('jrv_ok');
     expect(apiKeysService.touchLastUsed).toHaveBeenCalledWith('key-1');
     expect(request.apiKeyProfile).toBe(profile);
+    expect(request.apiKeyId).toBe('key-1');
   });
 
   it('is applied to the public API controller', () => {
