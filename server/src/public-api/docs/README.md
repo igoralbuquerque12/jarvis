@@ -44,6 +44,7 @@ Erros:
 | ------ | ------------------------------------------------------------- |
 | `400`  | corpo inválido (campo faltando, vazio, longo demais ou extra) |
 | `401`  | chave ausente, inválida ou inativa                            |
+| `429`  | mais de uma requisição com a mesma chave em um minuto          |
 | `409`  | o perfil ainda não vinculou um número de WhatsApp             |
 | `503`  | o WhatsApp do Jarvis está desconectado no momento             |
 
@@ -71,7 +72,7 @@ curl -X POST https://<host>/v1/messages \
 
 ```
 public-api/
-├── public-api.module.ts                  # importa ApiKeysModule + WhatsappModule
+├── public-api.module.ts                  # importa ApiKeysModule + RedisModule + WhatsappModule
 ├── controllers/public-api.controller.ts  # rotas /v1/*
 ├── dto/send-self-message.dto.ts
 └── services/public-api.service.ts
