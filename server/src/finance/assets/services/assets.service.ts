@@ -11,7 +11,7 @@ export class AssetsService {
   constructor(
     private readonly securoApi: SecuroApiService,
     private readonly securoContext: SecuroContextService,
-  ) {}
+  ) { }
 
   async findAssets(profileId: string) {
     const context = await this.securoContext.contextFor(profileId);

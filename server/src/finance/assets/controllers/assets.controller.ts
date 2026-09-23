@@ -22,7 +22,7 @@ export class AssetsController {
     private readonly authService: BetterAuthService,
     private readonly profileService: ProfileService,
     private readonly assetsService: AssetsService,
-  ) {}
+  ) { }
 
   @Get()
   async findMyAssets(@Req() request: Request) {
