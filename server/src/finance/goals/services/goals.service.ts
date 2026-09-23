@@ -11,7 +11,7 @@ export class GoalsService {
   constructor(
     private readonly securoApi: SecuroApiService,
     private readonly securoContext: SecuroContextService,
-  ) {}
+  ) { }
 
   async findGoals(profileId: string, filters: FindGoalsDto) {
     const context = await this.securoContext.contextFor(profileId);

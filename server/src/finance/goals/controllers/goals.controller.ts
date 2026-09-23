@@ -24,7 +24,7 @@ export class GoalsController {
     private readonly authService: BetterAuthService,
     private readonly profileService: ProfileService,
     private readonly goalsService: GoalsService,
-  ) {}
+  ) { }
 
   @Get()
   async findMyGoals(@Req() request: Request, @Query() filters: FindGoalsDto) {
