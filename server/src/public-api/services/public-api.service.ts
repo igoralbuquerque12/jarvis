@@ -1,12 +1,7 @@
-import {
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import type { Profile } from '@prisma/client';
-import { RedisService } from '../../redis/services/redis.service';
 import { isWhatsappLinked } from '../../profile/entities/profile-me.view';
+import { RateLimitService } from '../../redis/services/rate-limit.service';
 import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 
 export interface SentMessageView {
@@ -18,7 +13,7 @@ export interface SentMessageView {
 export class PublicApiService {
   constructor(
     private readonly whatsappSender: WhatsappSenderService,
-    private readonly redisService: RedisService,
+    private readonly rateLimitService: RateLimitService,
   ) {}
 
   /** Delivers a message from Jarvis to the key owner's own WhatsApp. */
@@ -28,19 +23,7 @@ export class PublicApiService {
     message: string,
   ): Promise<SentMessageView> {
     const rateLimitKey = `public-api:messages:rate-limit:${apiKeyId}`;
-    const acquired = await this.redisService
-      .getClient()
-      .set(rateLimitKey, '1', {
-        NX: true,
-        EX: 60,
-      });
-
-    if (acquired !== 'OK') {
-      throw new HttpException(
-        'Rate limit exceeded. Please try again in one minute.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
+    await this.rateLimitService.check(rateLimitKey);
 
     if (!isWhatsappLinked(profile)) {
       throw new ConflictException(
