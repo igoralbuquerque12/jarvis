@@ -1,6 +1,6 @@
-import { ConflictException, HttpException, HttpStatus } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import type { Profile } from '@prisma/client';
-import { RedisService } from '../../redis/services/redis.service';
+import { RateLimitService } from '../../redis/services/rate-limit.service';
 import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import { PublicApiService } from '../services/public-api.service';
 
@@ -22,15 +22,15 @@ function buildProfile(jid: string): Profile {
 
 describe('PublicApiService', () => {
   let sender: { sendMessage: jest.Mock };
-  let redisClient: { set: jest.Mock };
+  let rateLimitService: { check: jest.Mock };
   let service: PublicApiService;
 
   beforeEach(() => {
     sender = { sendMessage: jest.fn().mockResolvedValue({ sent: true }) };
-    redisClient = { set: jest.fn().mockResolvedValue('OK') };
+    rateLimitService = { check: jest.fn().mockResolvedValue(undefined) };
     service = new PublicApiService(
       sender as unknown as WhatsappSenderService,
-      { getClient: () => redisClient } as unknown as RedisService,
+      rateLimitService as unknown as RateLimitService,
     );
   });
 
@@ -39,10 +39,8 @@ describe('PublicApiService', () => {
 
     const result = await service.sendMessageToSelf('key-1', profile, '  olá  ');
 
-    expect(redisClient.set).toHaveBeenCalledWith(
+    expect(rateLimitService.check).toHaveBeenCalledWith(
       'public-api:messages:rate-limit:key-1',
-      '1',
-      { NX: true, EX: 60 },
     );
     expect(sender.sendMessage).toHaveBeenCalledWith(profile.jid, 'olá');
     expect(result.sent).toBe(true);
@@ -58,16 +56,13 @@ describe('PublicApiService', () => {
     expect(sender.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('limits each API key to one request per minute', async () => {
-    redisClient.set.mockResolvedValue(null);
+  it('does not send when the rate limit is exceeded', async () => {
+    rateLimitService.check.mockRejectedValue(new Error('rate limited'));
     const profile = buildProfile('5511999999999@s.whatsapp.net');
 
     await expect(
       service.sendMessageToSelf('key-1', profile, 'Hello'),
-    ).rejects.toMatchObject({
-      status: HttpStatus.TOO_MANY_REQUESTS,
-      message: 'Rate limit exceeded. Please try again in one minute.',
-    } satisfies Partial<HttpException>);
+    ).rejects.toThrow('rate limited');
     expect(sender.sendMessage).not.toHaveBeenCalled();
   });
 });
