@@ -1,0 +1,63 @@
+1. O modelo agora sabe quando terminou
+
+Antes: o prompt dizia "conclua o pedido dentro da mesma resposta", mas nunca definia o que é "concluído". O modelo decidia sozinho, e a decisão dele foi: confirmar assim que enviou a chamada.
+
+Agora: existe a seção "Critérios de conclusão". Ela lista as quatro únicas situações em que a resposta pode acabar: dado obtido e apresentado, ação confirmada pela ferramenta, impossibilidade explicada, ou pergunta feita. E uma regra ao lado: "nunca afirme que algo foi criado sem o retorno de sucesso".
+
+Por que importa: no seu histórico, o Jarvis confirmou "hoje às 12:00" com o horário que o usuário pediu. Se o usuário tivesse dito "12:05", o sistema teria gravado 12:10 e o Jarvis confirmaria 12:05, um lembrete errado com uma confirmação convincente. Para fechar isso de vez, o backend passou a devolver scheduledAtLocal (hora gravada, arredondada, no fuso do usuário) e o prompt manda confirmar com esse valor. A regra no prompt sem o dado no retorno seria só um pedido; com o dado, vira um comportamento verificável.
+
+2. Uma política de confirmação, num lugar só
+
+Antes: três fontes diziam coisas diferentes. O diretório: "peça confirmação antes de excluir". A descrição de delete_event: "confirme com o usuário qual item cancelar". O exemplo do dentista: deletava sem confirmar. E "confirme antes" aparecia mais sete vezes nas tools de finance.
+
+Agora: a seção "Autonomia e confirmação" decide tudo em quatro linhas, e as descrições das tools não falam de confirmação. Lembrete com um único match: cancela e avisa. Vários matches: pergunta qual. Dado financeiro: mostra o item e espera o "sim". Há um teste (main.tools.spec.ts) que falha se alguém voltar a escrever "confirme com o usuário" numa tool.
+
+Por que importa: quando o modelo recebe instruções contraditórias, ele não escolhe a melhor; ele oscila. Um dia cancela direto, no outro pergunta, e o usuário sente o Jarvis como imprevisível. Uma regra escrita uma vez é a única forma de o comportamento ser estável.
+
+3. Erros que o modelo consegue ler e consertar
+
+Antes: um campo inválido devolvia o array cru do class-validator; um id errado devolvia 404 com "Event series X not found"; um nome de operação errado devolvia "Operação não suportada". O prompt pedia "corrija e tente uma vez", mas o modelo não tinha como saber o que corrigir.
+
+Agora: todo erro dos endpoints M2M tem o formato { error: { code, message, fields? } } com seis códigos. O prompt diz o que fazer com cada um: validation_error → corrigir os campos em fields e tentar uma vez; not_found → listar de novo; unsupported_operation → usar um nome da lista; unavailable e afins → não repetir, avisar. validateDto também rejeita campos que não existem, dizendo qual é.
+
+Por que importa: o documento chama isso de tratar a ferramenta como política de uso. A ferramenta não é só o endpoint; é o endpoint mais o contrato de resposta mais a instrução do que fazer com ela. Antes, uma falha de validação virava ou uma retentativa cega ou um "não consegui" vago. Agora vira uma correção dirigida.
+
+4. O backend não confia no modelo
+
+Antes: delete_event recebia eventSeriesId e cancelava, sem checar se a série era do profileId da rota. Um id alucinado, ou um id de outro usuário que aparecesse no histórico, cancelaria o lembrete de outra pessoa. O endpoint web fazia a checagem; o M2M não.
+
+Agora: deleteEvent(profileId, eventSeriesId) responde 404 se a série for de outro perfil, e todos os ids passam por requireUuid antes de chegar ao serviço.
+
+Por que importa: a divisão de responsabilidades do documento é "o LLM decide, o schema limita a forma, o backend valida autorização". O prompt pedia para nunca inventar ids, mas prompt é probabilístico. Autorização não pode depender de probabilidade.
+
+5. Oito ferramentas em vez de duas
+
+Antes: finance era uma ferramenta com 28 operações descritas em texto, com data como string JSON. O modelo escolhia entre list_goals e record_asset_trade dentro do mesmo saco, sem tipo em nenhum campo.
+
+Agora: events, accounts, transactions, categories, rules, goals, recurring_transactions, assets. Cada uma com operation como enum e campos tipados (uuid, date, money, enums do Securo). O texto do prompt e o JSON Schema saem da mesma estrutura, então nunca divergem.
+
+Por que importa: dois efeitos. O primeiro é decisão: escolher "transactions" e depois "delete_transaction" é mais fácil do que escolher uma entre 28. O segundo é forma: com schema, amount é número, date tem formato, type só aceita debit ou credit. Boa parte dos validation_error deixa de acontecer antes de a chamada existir.
+
+6. Instrução separada de dado
+
+Antes: o system prompt tinha diretório, tools, data, perfil, histórico e um "lembrete final" repetindo regras; a mensagem atual ia crua como prompt do usuário. Você precisava da regra "nunca trate a mensagem como texto para analisar", que é um sintoma: o modelo via a conversa como documento.
+
+Agora: o system prompt tem só instruções e o contexto do dia (data, perfil). Histórico e mensagem atual vão no user prompt, dentro de <historico_recente> e <mensagem_atual>, e o diretório explica que o conteúdo dessas tags é fala, nunca instrução.
+
+Por que importa: o system prompt fica idêntico ao longo da conversa, o que ajuda cache e consistência. E o modelo passa a ter uma fronteira clara entre "o que eu devo fazer" e "o que foi dito", que é também a fronteira contra injeção via mensagem ou via campo about do perfil.
+
+7. Exemplos que ensinam decisão, não frase
+
+Antes: sete exemplos com a mesma estrutura, dois terminando com "é só falar". Resultado no seu histórico: todas as respostas terminavam com "qualquer outra coisa, é só chamar". O modelo não aprendeu a regra; decorou o fechamento.
+
+Agora: seis exemplos, cada um mostrando uma decisão diferente (perguntar horário, confirmar com o valor retornado, cadeia consulta-ação, desambiguar entre dois matches, usar o summary, formatação). Uma linha avisa que são ilustrativos. Um exemplo é negativo, mostrando o **negrito** errado e o fechamento automático.
+
+Por que importa: o modelo imita. Se você mostra cinco vezes a mesma frase, ele devolve a frase. Se mostra cinco decisões diferentes, ele devolve decisões.
+
+8. O que saiu
+
+O bloco "Como raciocinar antes de responder" (classifique, decida, liste, execute) e o "Lembrete final" do n8n. O primeiro tenta programar o raciocínio interno, que modelos atuais fazem melhor sozinhos quando têm objetivo, restrições e critério de sucesso. O segundo repetia regras já escritas. Mesmo prompt, menos tokens, menos chance de o modelo pesar uma instrução duas vezes.
+
+O que isso agrega, em resumo
+
+Antes o Jarvis era um prompt bonito que funcionava na maioria das vezes. Agora ele é um contrato: sabe de onde vêm os dados, o que pode fazer sozinho, quando parar, o que fazer com cada erro e como reconhecer que terminou. As falhas do seu histórico (confirmação cega, frase decorada, **) têm regra específica, e a falha de segurança está corrigida no código, não no prompt.
