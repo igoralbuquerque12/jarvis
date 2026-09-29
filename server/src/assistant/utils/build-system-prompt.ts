@@ -90,6 +90,12 @@ function renderTool(tool: AssistantTool): string {
     `Operações: ${tool.operations.map((operation) => operation.name).join(', ')}.`,
   ];
 
+  if (tool.dataEncoding === 'json-string') {
+    lines.push(
+      'Formato: envie data como um objeto JSON serializado em texto; para uma operação sem campos, envie "{}".',
+    );
+  }
+
   for (const operation of tool.operations) {
     lines.push('', ...renderOperation(operation));
   }
@@ -100,7 +106,7 @@ function renderTool(tool: AssistantTool): string {
 export function renderToolsReference(tools: AssistantTool[]): string {
   return [
     '# Ferramentas disponíveis',
-    'Toda ferramenta recebe "operation" (nome exato de uma das operações dela) e "data" (objeto com os campos da operação; {} quando não houver). Omita campos opcionais que não se aplicam. Quando uma operação precisar de um id, obtenha-o antes com a operação de listagem da mesma ferramenta. Nunca use uma operação em uma ferramenta que não a lista.',
+    'Toda ferramenta recebe "operation" (nome exato de uma das operações dela) e "data" (os campos da operação, no formato indicado pela própria ferramenta). Omita campos opcionais que não se aplicam. Quando uma operação precisar de um id, obtenha-o antes com a operação de listagem da mesma ferramenta. Nunca use uma operação em uma ferramenta que não a lista.',
     ...tools.map(renderTool),
   ].join('\n\n');
 }
