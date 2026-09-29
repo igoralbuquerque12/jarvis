@@ -19,12 +19,11 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
-  it('publishes every finance operation in its dedicated tools', () => {
-    const financeTools = ASSISTANT_TOOLS.filter((tool) => tool.name !== 'events');
+  it('publishes every finance operation in the finance RPC tool', () => {
+    const financeTool = ASSISTANT_TOOLS.find((tool) => tool.name === 'finance');
 
-    expect(financeTools).toHaveLength(7);
-    expect(financeTools.every((tool) => tool.path === '/finance-m2m/:profileId/execute')).toBe(true);
-    expect(financeTools.flatMap((tool) => tool.operations.map((operation) => operation.name))).toEqual([
+    expect(financeTool?.path).toBe('/finance-m2m/:profileId/execute');
+    expect(operationNames('finance')).toEqual([
       'list_accounts',
       'create_account',
       'create_transaction',
