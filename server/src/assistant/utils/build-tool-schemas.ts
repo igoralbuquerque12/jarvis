@@ -34,13 +34,20 @@ export function buildToolSchemas(tools: AssistantTool[]): ToolSchema[] {
             .map((operation) => `${operation.name}: ${operation.whenToUse}`)
             .join(' | '),
         },
-        data: {
-          type: 'object',
-          additionalProperties: false,
-          properties: mergeFields(tool),
-          description:
-            'Campos da operação escolhida. Envie {} quando a operação não tiver campos.',
-        },
+        data:
+          tool.dataEncoding === 'json-string'
+            ? {
+                type: 'string',
+                description:
+                  'Campos da operação escolhida como um objeto JSON serializado. Envie "{}" quando a operação não tiver campos.',
+              }
+            : {
+                type: 'object',
+                additionalProperties: false,
+                properties: mergeFields(tool),
+                description:
+                  'Campos da operação escolhida. Envie {} quando a operação não tiver campos.',
+              },
       },
     },
   }));
