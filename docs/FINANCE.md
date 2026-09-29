@@ -148,7 +148,7 @@ E opcionalmente, na raiz (interpolação do compose): `SECURO_SECRET_KEY=<segred
 
 - `finance.service.spec.ts` — mapeamento de payloads (conta padrão, dinheiro como string, snake_case, PATCH só com campos enviados, defaults BRL).
 - `securo-provisioning.service.spec.ts` — curto-circuito de conta ACTIVE, fluxo completo de provisioning, marcação de FAILED, cache de token.
-- `main.tools.spec.ts` — catálogo completo das 7 tools financeiras + garantia de que toda tool usa `/finance-m2m/:profileId`.
+- `main.tools.spec.ts` — catálogo completo das operações financeiras na tool RPC `finance`, que usa `/finance-m2m/:profileId`.
 
 `npm test`: 6 suítes, 34 testes passando. `npm run build` e `npm run lint` limpos.
 
