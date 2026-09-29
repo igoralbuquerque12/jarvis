@@ -17,6 +17,7 @@ export const EVENTS_TOOL: AssistantTool = {
   whenToUse:
     'Quando o usuário quiser ser lembrado de algo, criar uma rotina, ver o que está agendado ou cancelar um lembrete.',
   path: '/events-m2m/:profileId/execute',
+  dataEncoding: 'json-string',
   operations: [
     {
       name: 'create_event',
