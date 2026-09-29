@@ -65,8 +65,6 @@ export class EventsM2mService {
       await this.redisService.getClient().del(EVENTS_SCHEDULE_CACHE_KEY);
     }
 
-    // scheduledAtLocal is what the assistant must read back to the user:
-    // it already reflects the 10-minute rounding and the profile timezone.
     return {
       eventSeries,
       eventExecution,

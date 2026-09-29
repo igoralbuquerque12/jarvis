@@ -44,8 +44,6 @@ export class EventsM2mController {
         return this.eventsM2mService.findActiveEvents(dto);
       }
       case 'delete_event': {
-        // The series must belong to the profile in the route; the id alone
-        // is never enough (the model could hallucinate someone else's id).
         return this.eventsM2mService.deleteEvent(
           profileId,
           requireUuid(data, 'eventSeriesId'),
