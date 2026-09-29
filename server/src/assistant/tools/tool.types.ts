@@ -37,6 +37,8 @@ export type AssistantTool = {
   whenToUse: string;
   /** Backend endpoint the n8n tool node must call (profileId from context). */
   path: string;
+  /** n8n RPC tools receive the operation payload as a serialized JSON string. */
+  dataEncoding?: 'object' | 'json-string';
   operations: ToolOperation[];
 };
 
