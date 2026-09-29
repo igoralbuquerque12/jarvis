@@ -550,12 +550,28 @@ export const ASSETS_TOOL: AssistantTool = {
   ],
 };
 
-export const FINANCE_TOOLS: AssistantTool[] = [
-  ACCOUNTS_TOOL,
-  TRANSACTIONS_TOOL,
-  CATEGORIES_TOOL,
-  RULES_TOOL,
-  GOALS_TOOL,
-  RECURRING_TRANSACTIONS_TOOL,
-  ASSETS_TOOL,
-];
+/**
+ * The n8n workflow exposes finance as one RPC tool. Keep the backend
+ * catalogue in the same shape: the operation selects the domain action and
+ * data carries its arguments.
+ */
+export const FINANCE_TOOL: AssistantTool = {
+  name: 'finance',
+  description:
+    'Contas, transações, categorias, regras automáticas, metas, recorrências e investimentos do usuário.',
+  whenToUse:
+    'Quando o usuário quiser consultar, criar, alterar ou excluir qualquer dado financeiro.',
+  path: FINANCE_PATH,
+  dataEncoding: 'json-string',
+  operations: [
+    ...ACCOUNTS_TOOL.operations,
+    ...TRANSACTIONS_TOOL.operations,
+    ...CATEGORIES_TOOL.operations,
+    ...RULES_TOOL.operations,
+    ...GOALS_TOOL.operations,
+    ...RECURRING_TRANSACTIONS_TOOL.operations,
+    ...ASSETS_TOOL.operations,
+  ],
+};
+
+export const FINANCE_TOOLS: AssistantTool[] = [FINANCE_TOOL];
