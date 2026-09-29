@@ -107,17 +107,14 @@ describe('buildToolSchemas', () => {
     ]);
   });
 
-  it('merges fields shared by several operations', () => {
-    const transactions = schemas.find(
-      (schema) => schema.name === 'transactions',
-    );
-    const properties = transactions?.schema.properties as Record<
+  it('uses a serialized JSON string for RPC tool data', () => {
+    const finance = schemas.find((schema) => schema.name === 'finance');
+    const properties = finance?.schema.properties as Record<
       string,
-      { properties: Record<string, { description: string }> }
+      { type: string; description: string }
     >;
-    const amount = properties.data.properties.amount;
 
-    expect(amount.description).toContain('create_transaction: obrigatório');
-    expect(amount.description).toContain('update_transaction: opcional');
+    expect(properties.data.type).toBe('string');
+    expect(properties.data.description).toContain('JSON serializado');
   });
 });
