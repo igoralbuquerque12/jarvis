@@ -4,7 +4,7 @@ import { RateLimitService } from '../../redis/services/rate-limit.service';
 import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import { PublicApiService } from '../services/public-api.service';
 
-function buildProfile(jid: string): Profile {
+function buildProfile(jid: string | null): Profile {
   return {
     id: 'profile-1',
     userId: 'user-1',
@@ -48,7 +48,7 @@ describe('PublicApiService', () => {
   });
 
   it('refuses when the profile has not paired WhatsApp yet', async () => {
-    const profile = buildProfile('igor@example.com');
+    const profile = buildProfile(null);
 
     await expect(service.sendMessageToSelf('key-1', profile, 'olá')).rejects.toThrow(
       ConflictException,
