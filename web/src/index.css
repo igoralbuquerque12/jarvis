@@ -928,9 +928,12 @@ details summary {
    ------------------------------------------------------------ */
 
 .auth {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .auth__panel {
@@ -938,8 +941,9 @@ details summary {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 32px;
-  padding: 44px 52px;
+  gap: clamp(14px, 3.2vh, 32px);
+  min-height: 0;
+  padding: clamp(22px, 5vh, 44px) 52px;
   background: linear-gradient(168deg, #fff4e6 0%, #ffe8cf 48%, #ffd9b4 100%);
   border-right: 1px solid var(--line);
   overflow: hidden;
@@ -954,9 +958,9 @@ details summary {
 .auth__panel-sun {
   position: absolute;
   right: -54px;
-  bottom: 64px;
-  width: 270px;
-  height: 270px;
+  bottom: clamp(32px, 7vh, 64px);
+  width: clamp(180px, 30vh, 270px);
+  height: clamp(180px, 30vh, 270px);
   border-radius: 50%;
   z-index: 0;
   background: linear-gradient(
@@ -980,7 +984,7 @@ details summary {
   left: -12%;
   right: -12%;
   bottom: -46px;
-  height: 230px;
+  height: clamp(150px, 25vh, 230px);
   z-index: 1;
   transform: perspective(340px) rotateX(58deg);
   transform-origin: bottom;
@@ -998,10 +1002,10 @@ details summary {
 }
 
 .auth__hero h1 {
-  font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+  font-size: clamp(1.4rem, min(2.6vw, 4.2vh), 2.3rem);
   font-weight: 800;
   text-transform: uppercase;
-  margin: 14px 0 12px;
+  margin: clamp(8px, 1.6vh, 14px) 0 clamp(8px, 1.4vh, 12px);
 }
 
 .auth__hero h1 em {
@@ -1020,8 +1024,8 @@ details summary {
 .capabilities {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 18px;
-  margin: 28px 0 0;
+  gap: clamp(6px, 1.2vh, 10px) 18px;
+  margin: clamp(14px, 3vh, 28px) 0 0;
   padding: 0;
   list-style: none;
   max-width: 30rem;
@@ -1060,7 +1064,10 @@ details summary {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  min-height: 0;
+  /* Último recurso em telas muito baixas: rola só a coluna, nunca a página */
+  overflow-y: auto;
+  padding: clamp(16px, 5vh, 48px) 24px;
   background-image: radial-gradient(rgba(34, 27, 16, 0.05) 1px, transparent 1px);
   background-size: 26px 26px;
 }
@@ -1068,14 +1075,16 @@ details summary {
 .auth__form-col {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: clamp(10px, 2vh, 18px);
   width: 100%;
   max-width: 440px;
   min-width: 0;
+  /* margin auto centraliza sem cortar o topo quando a coluna transborda */
+  margin: auto 0;
 }
 
 .auth__form-col .card {
-  padding: 32px;
+  padding: clamp(20px, 3.6vh, 32px) 32px;
 }
 
 .auth__form-mobile-brand {
@@ -1084,7 +1093,7 @@ details summary {
 }
 
 .auth__actions {
-  margin-top: 24px;
+  margin-top: clamp(14px, 2.6vh, 24px);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1097,7 +1106,7 @@ details summary {
 }
 
 .auth__card-head {
-  margin-bottom: 22px;
+  margin-bottom: clamp(12px, 2.4vh, 22px);
 }
 
 .auth__card-head h2 {
@@ -1113,7 +1122,11 @@ details summary {
 }
 
 .auth__switch {
-  margin-bottom: 22px;
+  margin-bottom: clamp(12px, 2.4vh, 22px);
+}
+
+.auth .field + .field {
+  margin-top: clamp(10px, 1.8vh, 16px);
 }
 
 .auth__form-foot {
@@ -1126,8 +1139,8 @@ details summary {
 .chat-mock {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 28px;
+  gap: clamp(6px, 1.2vh, 10px);
+  margin-top: clamp(14px, 3vh, 28px);
   max-width: 26rem;
 }
 
@@ -1240,9 +1253,38 @@ details summary {
   }
 }
 
+/* Telas baixas: o painel vai abrindo mão do conteúdo secundário em vez de rolar */
+@media (max-height: 820px) {
+  .auth__hero > p {
+    font-size: 0.94rem;
+  }
+
+  .capabilities li span {
+    display: none;
+  }
+}
+
+@media (max-height: 700px) {
+  .chat-mock {
+    display: none;
+  }
+}
+
+@media (max-height: 540px) {
+  .capabilities,
+  .auth__hero > p {
+    display: none;
+  }
+}
+
 @media (max-width: 960px) {
   .auth {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    overflow: visible;
   }
 
   .auth__panel {
@@ -1749,6 +1791,39 @@ details summary {
   letter-spacing: 0.28em;
   color: var(--accent-deep);
   overflow-wrap: anywhere;
+}
+
+.connect-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.connect-waiting__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: connect-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes connect-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 105, 15, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(244, 105, 15, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connect-waiting__dot {
+    animation: none;
+  }
 }
 
 .connected-banner {
