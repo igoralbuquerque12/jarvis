@@ -4,14 +4,14 @@ import type { Rule } from '../types/api';
 
 export function useMyRules() {
   const [rules, setRules] = useState<Rule[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Key of the last request that settled; loading is derived from it so the
+  // effect never sets state synchronously.
+  const [settledKey, setSettledKey] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-
     getMyRules()
       .then((data) => {
         if (active) {
@@ -29,7 +29,7 @@ export function useMyRules() {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setSettledKey(version);
       });
 
     return () => {
@@ -37,6 +37,7 @@ export function useMyRules() {
     };
   }, [version]);
 
+  const loading = settledKey !== version;
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   return { rules, loading, error, reload };
 }

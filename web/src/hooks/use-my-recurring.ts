@@ -4,14 +4,14 @@ import type { RecurringTransaction } from '../types/api';
 
 export function useMyRecurring() {
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Key of the last request that settled; loading is derived from it so the
+  // effect never sets state synchronously.
+  const [settledKey, setSettledKey] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-
     getMyRecurring()
       .then((data) => {
         if (active) {
@@ -29,7 +29,7 @@ export function useMyRecurring() {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setSettledKey(version);
       });
 
     return () => {
@@ -37,6 +37,7 @@ export function useMyRecurring() {
     };
   }, [version]);
 
+  const loading = settledKey !== version;
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   return { recurring, loading, error, reload };
 }

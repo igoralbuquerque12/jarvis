@@ -13,17 +13,18 @@ const EMPTY_PAGE: TransactionPage = {
 
 export function useMyTransactions(params: FindTransactionsParams = {}) {
   const [data, setData] = useState<TransactionPage>(EMPTY_PAGE);
-  const [loading, setLoading] = useState(true);
+  // Key of the last request that settled; loading is derived from it so the
+  // effect never sets state synchronously.
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
   // Serialize params so the effect dependency is stable
   const paramsKey = JSON.stringify(params);
+  const requestKey = `${paramsKey}:${version}`;
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-
     getMyTransactions(JSON.parse(paramsKey) as FindTransactionsParams)
       .then((page) => {
         if (active) {
@@ -41,15 +42,15 @@ export function useMyTransactions(params: FindTransactionsParams = {}) {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setSettledKey(requestKey);
       });
 
     return () => {
       active = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramsKey, version]);
+  }, [paramsKey, requestKey]);
 
+  const loading = settledKey !== requestKey;
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   return { data, loading, error, reload };
 }
