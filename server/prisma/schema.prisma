@@ -82,7 +82,7 @@ model Profile {
   userId         String?       @unique
   name           String
   token          String        @unique
-  jid            String        @unique
+  jid            String?       @unique
   about          String        @default("")
   timezone       String        @default("America/Sao_Paulo")
   active         Boolean       @default(true)
