@@ -358,11 +358,14 @@ details summary {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   margin-bottom: 18px;
 }
 
+/* Sem espaço, o aside desce para a linha de baixo em vez de espremer o título */
 .card__header > div:first-child {
+  flex: 1 1 10rem;
   min-width: 0;
 }
 
@@ -380,9 +383,11 @@ details summary {
 
 .card__aside {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  max-width: 100%;
 }
 
 /* ------------------------------------------------------------
