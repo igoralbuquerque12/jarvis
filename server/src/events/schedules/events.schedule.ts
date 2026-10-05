@@ -88,10 +88,12 @@ export class EventsSchedule {
     }>,
   ) {
     try {
-      await this.whatsappSenderService.sendMessage(
-        execution.eventSeries.profile.jid,
-        execution.content,
-      );
+      const { jid } = execution.eventSeries.profile;
+      if (!jid) {
+        throw new Error('Profile has not paired WhatsApp yet.');
+      }
+
+      await this.whatsappSenderService.sendMessage(jid, execution.content);
       await this.eventExecutionService.update(execution.id, {
         status: EventExecutionStatus.COMPLETED,
       });
