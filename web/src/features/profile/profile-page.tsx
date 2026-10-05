@@ -1,6 +1,5 @@
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Alert } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -9,6 +8,7 @@ import { Field, Select, TextArea, TextInput } from '../../components/ui/field';
 import { PageHeader } from '../../components/ui/page-header';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyProfile } from '../../hooks/use-my-profile';
+import { WhatsappCard } from '../dashboard/components/whatsapp-card';
 import { authClient } from '../../lib/auth-client';
 import { updateMyProfile } from '../../services/profile.service';
 import type { ProfileMe } from '../../types/api';
@@ -152,6 +152,8 @@ function ProfileView({
         </Card>
 
         <div className="stack">
+          <WhatsappCard profile={profile} onLinked={onUpdated} />
+
           <Card>
             <CardHeader
               title="Conta"
@@ -162,24 +164,6 @@ function ProfileView({
                 <dt>E-mail</dt>
                 <dd>{session?.user.email ?? '—'}</dd>
               </div>
-              <div className="account-row">
-                <dt>WhatsApp</dt>
-                <dd>
-                  {profile.whatsappLinked ? (
-                    <Badge variant="success">Conectado</Badge>
-                  ) : (
-                    <Link to="/dashboard#conectar">
-                      <Badge variant="accent">Conectar</Badge>
-                    </Link>
-                  )}
-                </dd>
-              </div>
-              {profile.whatsappNumber ? (
-                <div className="account-row">
-                  <dt>Número</dt>
-                  <dd className="mono">{profile.whatsappNumber}</dd>
-                </div>
-              ) : null}
               <div className="account-row">
                 <dt>Membro desde</dt>
                 <dd>
