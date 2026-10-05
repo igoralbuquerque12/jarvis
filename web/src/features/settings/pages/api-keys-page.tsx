@@ -124,8 +124,8 @@ function HowItWorksCard({ whatsappLinked }: { whatsappLinked: boolean }) {
       </ol>
       {!whatsappLinked ? (
         <p className="hint" style={{ marginTop: 14 }}>
-          As chamadas só funcionam depois de vincular seu WhatsApp no{' '}
-          <Link to="/dashboard">painel</Link>.
+          As chamadas só funcionam depois de{' '}
+          <Link to="/dashboard#conectar">vincular seu WhatsApp</Link>.
         </p>
       ) : null}
       <p className="hint" style={{ marginTop: 14 }}>
