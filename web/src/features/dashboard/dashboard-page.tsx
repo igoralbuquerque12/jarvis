@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Alert } from '../../components/ui/alert';
 import { IconPlus } from '../../components/ui/icons';
 import { PageHeader } from '../../components/ui/page-header';
@@ -23,8 +24,10 @@ function todayLabel() {
 }
 
 export function DashboardPage() {
+  const { hash } = useLocation();
   const {
     profile,
+    setProfile,
     loading: profileLoading,
     error: profileError,
   } = useMyProfile();
@@ -34,6 +37,17 @@ export function DashboardPage() {
     error: eventsError,
     reload: reloadEvents,
   } = useMyEvents();
+
+  // Client-side navigation doesn't jump to anchors, so links like
+  // "/dashboard#conectar" scroll here once the target has rendered.
+  useEffect(() => {
+    if (!hash || profileLoading) {
+      return;
+    }
+    document
+      .getElementById(hash.slice(1))
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [hash, profileLoading]);
 
   if (profileLoading) {
     return <Spinner page />;
@@ -83,7 +97,9 @@ export function DashboardPage() {
 
       <DashKpis events={events} timezone={profile.timezone} />
 
-      {!profile.whatsappLinked ? <WhatsappCard profile={profile} /> : null}
+      {!profile.whatsappLinked ? (
+        <WhatsappCard profile={profile} onLinked={setProfile} />
+      ) : null}
 
       <div className="cols">
         <div className="stack">
