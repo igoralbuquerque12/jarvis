@@ -78,7 +78,7 @@ Users can call Jarvis from outside via a per-profile API key. Two modules:
 
 `better-auth` is mounted **outside** the Nest pipeline: `main.ts` creates the app with `bodyParser: false` and registers `toNodeHandler(authService.instance)` on `/api/auth` *before* `express.json()`. Adding global body parsing above that mount will break auth.
 
-A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile`, so every signup gets a `Profile` with a generated 10-char token and (initially) the email as its `jid` placeholder — later overwritten when the user pairs over WhatsApp. Route protection is manual: controllers call `BetterAuthService.requireSession(request.headers)`; there is no guard.
+A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile`, so every signup gets a `Profile` with a generated 10-char token and `jid = null` — set when the user pairs over WhatsApp. `isWhatsappLinked` (`profile/entities/profile-me.view.ts`) is the null check; anything that sends to `profile.jid` must handle the unpaired case. Route protection is manual: controllers call `BetterAuthService.requireSession(request.headers)`; there is no guard.
 
 ### Persistence
 
