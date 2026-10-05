@@ -15,9 +15,10 @@ export class CreateProfileDto {
   @IsNotEmpty()
   token: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  jid: string;
+  jid?: string | null;
 
   @IsOptional()
   @IsString()

@@ -68,7 +68,7 @@ export class ProfileService {
       userId: user.id,
       name: displayName,
       token: generateToken(10),
-      jid: user.email,
+      jid: null,
       about: '',
       active: true,
       subscriptionId: subscription.id,
