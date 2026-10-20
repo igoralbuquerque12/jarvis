@@ -9,12 +9,15 @@ import { Spinner } from '../../../components/ui/spinner';
 import { describeRecurrence, formatEventInstant } from '../../../lib/format';
 import { cancelMyEventSeries } from '../../../services/events.service';
 import type { UpcomingEvent } from '../../../types/api';
+import { PlanLocked } from '../../plans/plan-locked';
 
 interface EventsCardProps {
   events: UpcomingEvent[];
   loading: boolean;
   error: string | null;
   timezone: string;
+  /** The profile's plan does not include events management. */
+  locked: boolean;
   onChanged: () => void;
 }
 
@@ -100,6 +103,7 @@ export function EventsCard({
   loading,
   error,
   timezone,
+  locked,
   onChanged,
 }: EventsCardProps) {
   return (
@@ -108,13 +112,15 @@ export function EventsCard({
         title="Próximos lembretes"
         subtitle="O que o Jarvis vai te enviar no WhatsApp."
         aside={
-          events.length > 0 ? (
+          !locked && events.length > 0 ? (
             <Badge variant="accent">{events.length}</Badge>
           ) : undefined
         }
       />
 
-      {loading ? (
+      {locked ? (
+        <PlanLocked feature="A gestão de lembretes" />
+      ) : loading ? (
         <div className="spinner-wrap">
           <Spinner />
         </div>
