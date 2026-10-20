@@ -1,6 +1,7 @@
 import { Controller, Get, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { BetterAuthService } from '../../auth/services/better-auth.service';
+import { toSubscriptionView } from '../entities/subscription.view';
 import { SubscriptionService } from '../services/subscription.service';
 
 @Controller('subscriptions')
@@ -15,11 +16,6 @@ export class SubscriptionController {
     await this.authService.requireSession(request.headers);
     const subscriptions = await this.subscriptionService.findAll();
 
-    return subscriptions.map((subscription) => ({
-      id: subscription.id,
-      name: subscription.name,
-      price: Number(subscription.price),
-      limit: subscription.limit,
-    }));
+    return subscriptions.map(toSubscriptionView);
   }
 }
