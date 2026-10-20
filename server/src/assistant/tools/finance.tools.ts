@@ -10,6 +10,7 @@ import {
   SECURO_RULE_OPS,
   SECURO_TRANSACTION_TYPES,
 } from '../../finance/core/constants/securo-vocab.constant';
+import { PLAN_FEATURE_MIN_PLAN } from '../../subscription/constants/subscription-plans.constant';
 import {
   AssistantTool,
   booleanField,
@@ -563,6 +564,7 @@ export const FINANCE_TOOL: AssistantTool = {
     'Quando o usuário quiser consultar, criar, alterar ou excluir qualquer dado financeiro.',
   path: FINANCE_PATH,
   dataEncoding: 'json-string',
+  minPlan: PLAN_FEATURE_MIN_PLAN.fullFinanceManagement,
   operations: [
     ...ACCOUNTS_TOOL.operations,
     ...TRANSACTIONS_TOOL.operations,
