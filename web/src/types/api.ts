@@ -1,16 +1,19 @@
-export interface ProfileSubscription {
-  id: string;
-  name: string;
-  price: number;
-  limit: number;
+/** Mirrors SubscriptionPlanFeatures (server/src/subscription/constants). */
+export interface PlanFeatures {
+  messageLimit: boolean;
+  eventsManagement: boolean;
+  fullFinanceManagement: boolean;
 }
 
 export interface Plan {
   id: string;
   name: string;
   price: number;
-  limit: number;
+  plan: number;
+  features: PlanFeatures;
 }
+
+export type ProfileSubscription = Plan;
 
 export interface ProfileMe {
   name: string;
