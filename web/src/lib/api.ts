@@ -2,12 +2,29 @@ import { apiBaseUrl } from './config';
 
 export class ApiError extends Error {
   readonly status: number;
+  /** Machine-readable code from the body, e.g. "plan_required". */
+  readonly code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
+}
+
+/** The route exists but the profile's plan does not include it (403). */
+export function isPlanRequiredError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'plan_required';
+}
+
+function extractErrorCode(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('code' in body)) {
+    return null;
+  }
+
+  const { code } = body as { code?: unknown };
+  return typeof code === 'string' ? code : null;
 }
 
 function extractErrorMessage(body: unknown): string | null {
@@ -47,6 +64,7 @@ export async function apiFetch<T>(
     throw new ApiError(
       response.status,
       extractErrorMessage(body) ?? `Falha na requisição (${response.status}).`,
+      extractErrorCode(body),
     );
   }
 
