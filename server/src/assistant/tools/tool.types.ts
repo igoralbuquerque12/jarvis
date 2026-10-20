@@ -28,6 +28,8 @@ export type ToolOperation = {
   /** Example of the `data` object. */
   example: Record<string, unknown>;
   notes?: string;
+  /** Extra minimum plan for this operation, on top of the tool's `minPlan`. */
+  minPlan?: number;
 };
 
 export type AssistantTool = {
@@ -39,6 +41,11 @@ export type AssistantTool = {
   path: string;
   /** n8n RPC tools receive the operation payload as a serialized JSON string. */
   dataEncoding?: 'object' | 'json-string';
+  /**
+   * Minimum plan to expose the tool (defaults to the free tier). Profiles
+   * below it never see the tool in the catalogue sent to n8n.
+   */
+  minPlan?: number;
   operations: ToolOperation[];
 };
 
