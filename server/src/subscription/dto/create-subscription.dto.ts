@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateSubscriptionDto {
   @IsString()
@@ -11,8 +18,10 @@ export class CreateSubscriptionDto {
   @Min(0)
   price: number;
 
+  /** Omit to take the lowest unused plan number. */
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  limit: number;
+  @Min(1)
+  plan?: number;
 }
