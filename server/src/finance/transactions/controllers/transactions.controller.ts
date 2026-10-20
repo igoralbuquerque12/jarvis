@@ -17,7 +17,10 @@ import { CreateTransactionDto } from '../dto/create-transaction.dto';
 import { FindTransactionsDto } from '../dto/find-transactions.dto';
 import { UpdateTransactionDto } from '../dto/update-transaction.dto';
 import { TransactionsService } from '../services/transactions.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/transactions')
 export class TransactionsController {
   constructor(

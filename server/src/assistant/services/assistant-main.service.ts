@@ -7,17 +7,12 @@ import { MessagesService } from '../../messages/services/messages.service';
 import { AssistantWorkflowService } from './assistant-workflow.service';
 import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import { AssistantConnectionService } from './assistant-connection.service';
-import { ASSISTANT_TOOLS } from '../tools/main.tools';
-import {
-  buildDirective,
-  buildTemporalContext,
-} from '../utils/build-system-prompt';
+import { AssistantToolsService } from './assistant-tools.service';
+import { SubscriptionService } from '../../subscription/services/subscription.service';
+import { buildTemporalContext } from '../utils/build-system-prompt';
 import type { ReceiveMessageWorkflowInput } from '../entities/receive-message-workflow-input';
 
 const HISTORY_SIZE = 10;
-
-/** Static for the process lifetime: instructions + rendered tool catalogue. */
-const DIRECTIVE = buildDirective(ASSISTANT_TOOLS);
 
 @Injectable()
 export class AssistantMainService {
@@ -29,6 +24,8 @@ export class AssistantMainService {
     private readonly assistantWorkflowService: AssistantWorkflowService,
     private readonly whatsappSenderService: WhatsappSenderService,
     private readonly assistantConnectionService: AssistantConnectionService,
+    private readonly assistantToolsService: AssistantToolsService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   async receiveMessage(data: IncomingMessageDto) {
@@ -60,8 +57,6 @@ export class AssistantMainService {
         };
       }
 
-      // Loaded before persisting the current message, so it is never
-      // duplicated between `lastMessages` and `currentMessage`.
       const history = await this.messagesService.findAll({
         userId: profile.id,
         take: HISTORY_SIZE,
@@ -78,21 +73,28 @@ export class AssistantMainService {
         type: MessageType.user,
       });
 
+      const plan = await this.subscriptionService.findPlanNumber(
+        profile.subscriptionId,
+      );
+      const { directive, tools } = this.assistantToolsService.forPlan(plan);
+
       const workflowInput: ReceiveMessageWorkflowInput = {
-        directive: DIRECTIVE,
+        directive,
         profileId: profile.id,
         profileContext: profile.about,
         currentMessage,
         lastMessages,
-        tools: ASSISTANT_TOOLS,
+        tools,
         ...buildTemporalContext(profile.timezone),
       };
       this.logger.debug(
-        `Workflow input for profile ${profile.id}: ${JSON.stringify({
-          ...workflowInput,
-          directive: `[${DIRECTIVE.length} chars]`,
-          tools: `[${ASSISTANT_TOOLS.length} modules]`,
-        })}`,
+        `Workflow input for profile ${profile.id} (plan ${plan}): ${JSON.stringify(
+          {
+            ...workflowInput,
+            directive: `[${directive.length} chars]`,
+            tools: tools.map((tool) => tool.name),
+          },
+        )}`,
       );
 
       const responseWorkflow =

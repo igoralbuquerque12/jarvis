@@ -15,7 +15,10 @@ import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import { CategoriesService } from '../services/categories.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/categories')
 export class CategoriesController {
   constructor(

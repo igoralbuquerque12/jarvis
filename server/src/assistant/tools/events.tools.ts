@@ -6,6 +6,7 @@ import {
   uuidField,
   dateField,
 } from './tool.types';
+import { PLAN_FEATURE_MIN_PLAN } from '../../subscription/constants/subscription-plans.constant';
 
 const EVENT_TYPES = ['UNIQUE', 'RECURRENCE'] as const;
 const RECURRENCE_MODES = ['HOUR', 'DAY', 'WEEK', 'MONTH'] as const;
@@ -18,6 +19,7 @@ export const EVENTS_TOOL: AssistantTool = {
     'Quando o usuário quiser ser lembrado de algo, criar uma rotina, ver o que está agendado ou cancelar um lembrete.',
   path: '/events-m2m/:profileId/execute',
   dataEncoding: 'json-string',
+  minPlan: PLAN_FEATURE_MIN_PLAN.eventsManagement,
   operations: [
     {
       name: 'create_event',

@@ -15,7 +15,10 @@ import { CreateAssetDto } from '../dto/create-asset.dto';
 import { CreateAssetTradeDto } from '../dto/create-asset-trade.dto';
 import { CreateAssetValueDto } from '../dto/create-asset-value.dto';
 import { AssetsService } from '../services/assets.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/assets')
 export class AssetsController {
   constructor(

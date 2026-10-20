@@ -4,6 +4,7 @@ import { Card, CardHeader } from '../../../components/ui/card';
 import { IconArrowRight } from '../../../components/ui/icons';
 import { formatCurrencyBRL } from '../../../lib/format';
 import type { ProfileMe } from '../../../types/api';
+import { describePlanFeatures } from '../../plans/plan-features';
 
 export function SubscriptionCard({ profile }: { profile: ProfileMe }) {
   const { subscription } = profile;
@@ -36,10 +37,12 @@ export function SubscriptionCard({ profile }: { profile: ProfileMe }) {
         ) : null}
       </div>
       <div className="plan-meta">
-        <div className="plan-meta__row">
-          <span>Limite do plano</span>
-          <strong>{subscription.limit} mensagens</strong>
-        </div>
+        {describePlanFeatures(subscription.features).map((feature) => (
+          <div key={feature.key} className="plan-meta__row">
+            <span>{feature.label}</span>
+            <strong>{feature.included ? 'Incluso' : 'Não incluso'}</strong>
+          </div>
+        ))}
         <div className="plan-meta__row">
           <span>Membro desde</span>
           <strong>{memberSince}</strong>

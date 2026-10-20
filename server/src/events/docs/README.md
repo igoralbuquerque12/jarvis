@@ -67,6 +67,12 @@ Diferente dos `/events-m2m/*` (protegidos apenas pela rede interna), estes
 endpoints exigem sessão do better-auth (cookie) e operam sempre sobre o perfil
 do usuário logado — o `profileId` nunca vem do cliente.
 
+O controller tem `@RequiresPlan(PLAN_FEATURE_MIN_PLAN.eventsManagement)`: se o
+plano do usuário for inferior ao mínimo, a resposta é `403
+{ code: 'plan_required', requiredPlan, currentPlan }`. Os `/events-m2m/*` não
+passam pelo guard; para o assistente, a tool `events` (`minPlan` igual) só é
+enviada ao n8n quando o plano do usuário a inclui.
+
 ### `GET /events/me`
 
 Lista execuções `PENDING` ou `PROCESSING` de séries ativas do perfil da sessão,

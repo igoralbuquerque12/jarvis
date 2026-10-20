@@ -3,24 +3,18 @@ import { Alert } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { EmptyState } from '../../components/ui/empty-state';
-import { IconCheck, IconLayers } from '../../components/ui/icons';
+import {
+  IconCheck,
+  IconClose,
+  IconLayers,
+} from '../../components/ui/icons';
 import { PageHeader } from '../../components/ui/page-header';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyProfile } from '../../hooks/use-my-profile';
 import { formatCurrencyBRL } from '../../lib/format';
 import { getPlans } from '../../services/subscriptions.service';
 import type { Plan } from '../../types/api';
-
-function planFeatures(plan: Plan): string[] {
-  return [
-    `Até ${plan.limit} mensagens por mês`,
-    'Lembretes únicos e recorrentes',
-    'Controle de gastos, contas fixas e metas',
-    'Carteira de investimentos',
-    'Categorização automática por regras',
-    'Tudo direto no WhatsApp',
-  ];
-}
+import { describePlanFeatures } from './plan-features';
 
 export function PlansPage() {
   const { profile } = useMyProfile();
@@ -56,7 +50,7 @@ export function PlansPage() {
       <PageHeader
         eyebrow="Planos"
         title="Escolha seu ritmo"
-        description="Todos os planos incluem o Jarvis completo no WhatsApp. O que muda é o volume de mensagens por mês. A troca de plano estará disponível em breve."
+        description="Compare o que cada plano libera no Jarvis pelo WhatsApp. A troca de plano estará disponível em breve."
       />
 
       {error ? (
@@ -92,10 +86,13 @@ export function PlansPage() {
                   ) : null}
                 </div>
                 <ul className="plan-features">
-                  {planFeatures(plan).map((feature) => (
-                    <li key={feature}>
-                      <IconCheck />
-                      {feature}
+                  {describePlanFeatures(plan.features).map((feature) => (
+                    <li
+                      key={feature.key}
+                      className={feature.included ? undefined : 'is-off'}
+                    >
+                      {feature.included ? <IconCheck /> : <IconClose />}
+                      {feature.label}
                     </li>
                   ))}
                 </ul>

@@ -11,7 +11,10 @@ import { BetterAuthService } from '../../auth/services/better-auth.service';
 import { ProfileService } from '../../profile/services/profile.service';
 import { EventExecutionService } from '../services/event-execution.service';
 import { EventsM2mService } from '../services/events-m2m.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.eventsManagement)
 @Controller('events')
 export class EventsController {
   constructor(

@@ -2059,6 +2059,14 @@ details summary {
   color: var(--accent-deep);
 }
 
+.plan-features li.is-off {
+  color: var(--ink-faint);
+}
+
+.plan-features li.is-off .icon {
+  color: currentColor;
+}
+
 .plan-card__cta {
   margin-top: auto;
 }

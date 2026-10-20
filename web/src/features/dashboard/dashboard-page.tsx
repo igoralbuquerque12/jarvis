@@ -108,6 +108,7 @@ export function DashboardPage() {
             loading={eventsLoading}
             error={eventsError}
             timezone={profile.timezone}
+            locked={!profile.subscription.features.eventsManagement}
             onChanged={reloadEvents}
           />
           <DashChartCard />

@@ -15,7 +15,10 @@ import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateRecurringTransactionDto } from '../dto/create-recurring-transaction.dto';
 import { UpdateRecurringTransactionDto } from '../dto/update-recurring-transaction.dto';
 import { RecurringTransactionsService } from '../services/recurring-transactions.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/recurring-transactions')
 export class RecurringTransactionsController {
   constructor(
