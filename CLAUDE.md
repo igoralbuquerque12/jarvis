@@ -78,7 +78,14 @@ Users can call Jarvis from outside via a per-profile API key. Two modules:
 
 `better-auth` is mounted **outside** the Nest pipeline: `main.ts` creates the app with `bodyParser: false` and registers `toNodeHandler(authService.instance)` on `/api/auth` *before* `express.json()`. Adding global body parsing above that mount will break auth.
 
-A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile`, so every signup gets a `Profile` with a generated 10-char token and `jid = null` — set when the user pairs over WhatsApp. `isWhatsappLinked` (`profile/entities/profile-me.view.ts`) is the null check; anything that sends to `profile.jid` must handle the unpaired case. Route protection is manual: controllers call `BetterAuthService.requireSession(request.headers)`; there is no guard.
+A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile`, so every signup gets a `Profile` with a generated 10-char token and `jid = null` — set when the user pairs over WhatsApp. `isWhatsappLinked` (`profile/entities/profile-me.view.ts`) is the null check; anything that sends to `profile.jid` must handle the unpaired case. Route protection is manual: controllers call `BetterAuthService.requireSession(request.headers)`; there is no session guard. Plan restrictions are the exception — see *Plans and access* below.
+
+### Plans and access
+
+`Subscription.plan` (unique Int) identifies a plan and ranks it: higher number = higher tier, access is `plan >= minimum`. New plans take the lowest unused number from 1, and plans are **never deleted** (`SubscriptionService.deactivate` sets `active = false`) so numbers keep their rank. `subscription/constants/subscription-plans.constant.ts` holds `FREE_TIER_PLAN` and `PLAN_FEATURE_MIN_PLAN` — the minimum plan of the core features only (events, full finance, unlimited messages); `getPlanFeatures(plan)` derives the booleans the web shows (`features` on `/subscriptions` and `/profile/me`). Other modules declare their minimum locally and are **not** added to that constant.
+
+- **Client routes (web session, `/v1` API key):** `@RequiresPlan(n)` on a controller or a route (route wins). It sets metadata + `PlanGuard`, which delegates to `PlanAccessService`: caller = `request.apiKeyProfile`, else the better-auth session; no identity → 401, plan too low → 403 `{ code: 'plan_required', requiredPlan, currentPlan }`. `SubscriptionModule` is `@Global()`, so no module import is needed. With `@UseGuards(ApiKeyGuard)` on the same class, write `@RequiresPlan` **above** it so the key is resolved first.
+- **M2M (n8n):** no plan guard. `AssistantToolsService.forPlan(plan)` filters `ASSISTANT_TOOLS` by `minPlan` (on the tool and, optionally, on each operation) before building the directive and the `tools` payload, so the model only sees what the user's plan unlocks.
 
 ### Persistence
 
@@ -93,6 +100,7 @@ A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile
 ## Conventions
 
 - Modules follow `controllers/ services/ dto/ entities/ utils/ schedules/`; tests are `*.spec.ts` colocated next to the unit under test (`rootDir` is `src`).
+- **Controllers contain no business logic.** They read the request (params, body, session), call a service method, and return its result — optionally mapped by an `entities/*.view.ts` helper. Rules, lookups, and branching belong in services. Guards follow the same rule: they read metadata and delegate the decision to a service.
 - Global `ValidationPipe` uses `whitelist`, `forbidNonWhitelisted`, `transform` — every request body/query needs a `class-validator` DTO or it will be rejected.
 - Inbound external payloads (the n8n response) are validated with Zod; internal HTTP DTOs use class-validator. Both patterns coexist by design.
 - User-facing strings, prompts, and module docs are pt-BR; code identifiers, comments in newer files, and commit messages are English.

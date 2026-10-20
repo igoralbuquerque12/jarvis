@@ -100,6 +100,8 @@ Duas fachadas com os mesmos recursos:
 - **M2M para o n8n** (sem auth de app, protegido pela rede interna — mesmo modelo do `events-m2m`): `/finance-m2m/:profileId/...`
 - **Front com sessão** (better-auth, padrão `requireSession` + `ensureAuthProfile`): `/finance/me/...`
 
+Acesso por plano: os controllers `/finance/me/*` têm `@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)` (plano inferior → `403 { code: 'plan_required' }`). O M2M não passa pelo guard; a tool `finance` tem o mesmo `minPlan` e só é enviada ao n8n quando o plano do usuário a inclui (uma operação pode ter `minPlan` próprio, acima do da tool).
+
 | Área | Rotas (sufixo após o prefixo) |
 |---|---|
 | Contas | `GET/POST .../accounts` |
