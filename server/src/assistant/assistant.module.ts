@@ -6,6 +6,7 @@ import { MessagesModule } from '../messages/messages.module';
 import { AssistantWorkflowService } from './services/assistant-workflow.service';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { AssistantConnectionService } from './services/assistant-connection.service';
+import { AssistantToolsService } from './services/assistant-tools.service';
 import { AssistantToolGuard } from './guards/assistant-tool.guard';
 
 @Module({
@@ -18,6 +19,7 @@ import { AssistantToolGuard } from './guards/assistant-tool.guard';
     AssistantMainService,
     AssistantWorkflowService,
     AssistantConnectionService,
+    AssistantToolsService,
     AssistantToolGuard,
   ],
   exports: [AssistantMainService],
