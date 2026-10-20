@@ -27,8 +27,10 @@ async function main(): Promise<void> {
   });
 
   try {
-    const subscription = await prisma.subscription.findFirst({
-      where: { name: 'Free Tier' },
+    // Mirrors FREE_TIER_PLAN / FREE_TIER_DEFAULTS in
+    // src/subscription/constants/subscription-plans.constant.ts.
+    const subscription = await prisma.subscription.findUnique({
+      where: { plan: 1 },
     });
     const freeSubscription =
       subscription ??
@@ -36,7 +38,7 @@ async function main(): Promise<void> {
         data: {
           name: 'Free Tier',
           price: 0,
-          limit: 100,
+          plan: 1,
         },
       }));
     const profileData = {
