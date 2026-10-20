@@ -4,7 +4,10 @@ import { BetterAuthService } from '../../../auth/services/better-auth.service';
 import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { AccountsService } from '../services/accounts.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/accounts')
 export class AccountsController {
   constructor(

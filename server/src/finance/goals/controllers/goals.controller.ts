@@ -17,14 +17,17 @@ import { CreateGoalDto } from '../dto/create-goal.dto';
 import { FindGoalsDto } from '../dto/find-goals.dto';
 import { UpdateGoalDto } from '../dto/update-goal.dto';
 import { GoalsService } from '../services/goals.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/goals')
 export class GoalsController {
   constructor(
     private readonly authService: BetterAuthService,
     private readonly profileService: ProfileService,
     private readonly goalsService: GoalsService,
-  ) { }
+  ) {}
 
   @Get()
   async findMyGoals(@Req() request: Request, @Query() filters: FindGoalsDto) {

@@ -15,14 +15,17 @@ import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateRuleDto } from '../dto/create-rule.dto';
 import { UpdateRuleDto } from '../dto/update-rule.dto';
 import { RulesService } from '../services/rules.service';
+import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
+import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
+@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)
 @Controller('finance/me/rules')
 export class RulesController {
   constructor(
     private readonly authService: BetterAuthService,
     private readonly profileService: ProfileService,
     private readonly rulesService: RulesService,
-  ) { }
+  ) {}
 
   @Get()
   async findMyRules(@Req() request: Request) {
