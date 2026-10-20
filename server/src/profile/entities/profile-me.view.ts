@@ -1,4 +1,8 @@
 import type { Prisma, Profile } from '@prisma/client';
+import {
+  SubscriptionView,
+  toSubscriptionView,
+} from '../../subscription/entities/subscription.view';
 
 const WHATSAPP_JID_SUFFIX = '@lid';
 
@@ -20,12 +24,7 @@ export interface ProfileMeView {
   token: string;
   whatsappLinked: boolean;
   whatsappNumber: string | null;
-  subscription: {
-    id: string;
-    name: string;
-    price: number;
-    limit: number;
-  };
+  subscription: SubscriptionView;
   createdAt: Date;
 }
 
@@ -49,12 +48,7 @@ export function toProfileMeView(
     token: profile.token,
     whatsappLinked,
     whatsappNumber: whatsappLinked ? maskWhatsappNumber(profile.jid) : null,
-    subscription: {
-      id: profile.subscription.id,
-      name: profile.subscription.name,
-      price: Number(profile.subscription.price),
-      limit: profile.subscription.limit,
-    },
+    subscription: toSubscriptionView(profile.subscription),
     createdAt: profile.createdAt,
   };
 }
