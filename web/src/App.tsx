@@ -79,7 +79,7 @@ export default function App() {
         }
       />
       <Route
-        path="/configuracoes/health-check"
+        path="/configuracoes/sentinela"
         element={
           <ProtectedPage>
             <SettingsShell>

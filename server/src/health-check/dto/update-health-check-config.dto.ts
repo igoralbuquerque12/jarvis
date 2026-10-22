@@ -1,5 +1,6 @@
 import { HealthCheckHttpMethod } from '@prisma/client';
 import {
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -46,5 +47,9 @@ export class UpdateHealthCheckConfigDto {
   @IsNotEmpty()
   @MaxLength(1500)
   alertMessage?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }
 

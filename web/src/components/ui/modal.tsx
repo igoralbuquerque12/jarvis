@@ -7,6 +7,7 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  xl?: boolean;
 }
 
 /**
@@ -17,7 +18,7 @@ interface ModalProps {
  * layer anyway, and closing here would fire `close` → `onClose` during
  * StrictMode's effect re-run and dismiss the modal as soon as it opens.
  */
-export function Modal({ title, onClose, children, wide = false }: ModalProps) {
+export function Modal({ title, onClose, children, wide = false, xl = false }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function Modal({ title, onClose, children, wide = false }: ModalProps) {
   return (
     <dialog
       ref={ref}
-      className={wide ? 'modal modal--wide' : 'modal'}
+      className={xl ? 'modal modal--xl' : wide ? 'modal modal--wide' : 'modal'}
       onClose={onClose}
       onClick={(event) => {
         if (event.target === ref.current) onClose();

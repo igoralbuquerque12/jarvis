@@ -139,6 +139,51 @@ describe('HealthCheckService', () => {
     expect(redisClient.del).toHaveBeenCalledWith(HEALTH_CHECK_CACHE_KEY);
   });
 
+  it('toggles active on update without touching the auth credentials', async () => {
+    const existing = {
+      id: 'cfg-1',
+      profileId: 'prof-1',
+      name: 'API',
+      url: 'https://api.com',
+      httpMethod: HealthCheckHttpMethod.GET,
+      endpoint: '/health',
+      authKey: 'Authorization',
+      authValue: 'enc:Bearer secret',
+      alertMessage: 'Erro',
+      active: true,
+    };
+    prisma.healthCheckConfig.findFirst.mockResolvedValue(existing);
+    prisma.healthCheckConfig.update.mockResolvedValue({
+      ...existing,
+      active: false,
+    });
+
+    await service.update('prof-1', 'cfg-1', { active: false });
+
+    expect(prisma.healthCheckConfig.update).toHaveBeenCalledWith({
+      where: { id: 'cfg-1' },
+      data: {
+        active: false,
+        authKey: 'Authorization',
+        authValue: 'enc:Bearer secret',
+      },
+    });
+    expect(redisClient.del).toHaveBeenCalledWith(HEALTH_CHECK_CACHE_KEY);
+  });
+
+  it('only loads active configs when building the execution cache', async () => {
+    redisClient.get.mockResolvedValue(null);
+    prisma.healthCheckConfig.findMany.mockResolvedValue([]);
+
+    await service.getConfigsForExecution();
+
+    expect(prisma.healthCheckConfig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { active: true, profile: { active: true } },
+      }),
+    );
+  });
+
   it('throws NotFoundException when updating a config from another profile', async () => {
     prisma.healthCheckConfig.findFirst.mockResolvedValue(null);
 

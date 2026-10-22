@@ -14,6 +14,7 @@ export interface HealthCheckConfigView {
   authKey: string | null;
   hasAuthValue: boolean;
   alertMessage: string;
+  active: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,7 @@ export function toHealthCheckConfigView(
     authKey: config.authKey,
     hasAuthValue: Boolean(config.authValue),
     alertMessage: config.alertMessage,
+    active: config.active,
     createdAt: config.createdAt,
     updatedAt: config.updatedAt,
   };
