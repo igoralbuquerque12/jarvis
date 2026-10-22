@@ -9,6 +9,7 @@ import { EventsSchedule } from './schedules/events.schedule';
 import { EventExecutionService } from './services/event-execution.service';
 import { EventSeriesService } from './services/event-series.service';
 import { EventsM2mService } from './services/events-m2m.service';
+import { EventsMeService } from './services/events-me.service';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { EventsM2mService } from './services/events-m2m.service';
     EventSeriesService,
     EventExecutionService,
     EventsM2mService,
+    EventsMeService,
     EventsSchedule,
   ],
   exports: [EventSeriesService, EventExecutionService],
