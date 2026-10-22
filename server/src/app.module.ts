@@ -12,6 +12,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { EventsModule } from './events/events.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { PublicApiModule } from './public-api/public-api.module';
+import { HealthCheckModule } from './health-check/health-check.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PublicApiModule } from './public-api/public-api.module';
     EventsModule,
     ApiKeysModule,
     PublicApiModule,
+    HealthCheckModule,
   ],
   controllers: [],
   providers: [],
