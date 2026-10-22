@@ -14,6 +14,7 @@ import { PlansPage } from './features/plans/plans-page';
 import { ProfilePage } from './features/profile/profile-page';
 import { ApiDocsPage } from './features/settings/pages/api-docs-page';
 import { ApiKeysPage } from './features/settings/pages/api-keys-page';
+import { HealthCheckPage } from './features/settings/pages/health-check-page';
 import { SettingsShell } from './features/settings/settings-shell';
 
 function ProtectedPage({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,16 @@ export default function App() {
           <ProtectedPage>
             <SettingsShell>
               <ApiKeysPage />
+            </SettingsShell>
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/configuracoes/health-check"
+        element={
+          <ProtectedPage>
+            <SettingsShell>
+              <HealthCheckPage />
             </SettingsShell>
           </ProtectedPage>
         }
