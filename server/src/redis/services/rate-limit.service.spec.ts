@@ -8,9 +8,9 @@ describe('RateLimitService', () => {
 
   beforeEach(() => {
     redisClient = { set: jest.fn().mockResolvedValue('OK') };
-    service = new RateLimitService(
-      { getClient: () => redisClient } as unknown as RedisService,
-    );
+    service = new RateLimitService({
+      getClient: () => redisClient,
+    } as unknown as RedisService);
   });
 
   it('acquires a 60-second lock for the provided key', async () => {

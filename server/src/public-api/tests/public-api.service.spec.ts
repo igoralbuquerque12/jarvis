@@ -50,9 +50,9 @@ describe('PublicApiService', () => {
   it('refuses when the profile has not paired WhatsApp yet', async () => {
     const profile = buildProfile(null);
 
-    await expect(service.sendMessageToSelf('key-1', profile, 'olá')).rejects.toThrow(
-      ConflictException,
-    );
+    await expect(
+      service.sendMessageToSelf('key-1', profile, 'olá'),
+    ).rejects.toThrow(ConflictException);
     expect(sender.sendMessage).not.toHaveBeenCalled();
   });
 

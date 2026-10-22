@@ -9,9 +9,7 @@ describe('ASSISTANT_TOOLS', () => {
   it('publishes every events operation in the events tool', () => {
     const eventsTool = ASSISTANT_TOOLS.find((tool) => tool.name === 'events');
 
-    expect(eventsTool?.path).toBe(
-      '/events-m2m/:profileId/execute',
-    );
+    expect(eventsTool?.path).toBe('/events-m2m/:profileId/execute');
     expect(operationNames('events')).toEqual([
       'create_event',
       'find_active_events',

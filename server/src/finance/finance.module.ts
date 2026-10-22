@@ -32,10 +32,7 @@ import { SecuroContextService } from './core/services/securo-context.service';
 import { SecuroProvisioningService } from './core/services/securo-provisioning.service';
 
 @Module({
-  imports: [
-    forwardRef(() => AuthModule),
-    forwardRef(() => ProfileModule),
-  ],
+  imports: [forwardRef(() => AuthModule), forwardRef(() => ProfileModule)],
   controllers: [
     FinanceM2mController,
     AccountsController,

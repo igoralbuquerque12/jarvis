@@ -54,10 +54,7 @@ export function buildToolSchemas(tools: AssistantTool[]): ToolSchema[] {
 }
 
 function mergeFields(tool: AssistantTool): Record<string, unknown> {
-  const merged = new Map<
-    string,
-    { field: ToolField; usage: string[] }
-  >();
+  const merged = new Map<string, { field: ToolField; usage: string[] }>();
 
   for (const operation of tool.operations) {
     for (const field of operation.fields) {
@@ -80,7 +77,10 @@ function mergeFields(tool: AssistantTool): Record<string, unknown> {
   );
 }
 
-function fieldToSchema(field: ToolField, usage: string[]): Record<string, unknown> {
+function fieldToSchema(
+  field: ToolField,
+  usage: string[],
+): Record<string, unknown> {
   const schema: Record<string, unknown> = {
     type: field.type,
     description: `[${usage.join('; ')}] ${field.description}`,
@@ -90,7 +90,11 @@ function fieldToSchema(field: ToolField, usage: string[]): Record<string, unknow
     schema.enum = [...field.enum];
   }
 
-  if (field.format === 'uuid' || field.format === 'date' || field.format === 'date-time') {
+  if (
+    field.format === 'uuid' ||
+    field.format === 'date' ||
+    field.format === 'date-time'
+  ) {
     schema.format = field.format;
   }
 

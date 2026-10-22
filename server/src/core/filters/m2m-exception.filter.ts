@@ -117,7 +117,11 @@ export class M2mExceptionFilter implements ExceptionFilter {
       return payload;
     }
 
-    if (typeof payload === 'object' && payload !== null && 'message' in payload) {
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      'message' in payload
+    ) {
       const message = payload.message;
 
       if (Array.isArray(message)) {
