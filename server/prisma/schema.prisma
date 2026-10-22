@@ -90,9 +90,10 @@ model Profile {
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventSeries    EventSeries[]
-  securoAccount  SecuroAccount?
-  apiKeys        ApiKey[]
-  createdAt      DateTime      @default(now())
+  securoAccount      SecuroAccount?
+  apiKeys            ApiKey[]
+  healthCheckConfigs HealthCheckConfig[]
+  createdAt          DateTime            @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@index([subscriptionId])
@@ -220,4 +221,27 @@ enum EventExecutionStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum HealthCheckHttpMethod {
+  GET
+  POST
+}
+
+model HealthCheckConfig {
+  id           String                @id @default(uuid()) @db.Uuid
+  profileId    String                @db.Uuid
+  name         String
+  url          String
+  httpMethod   HealthCheckHttpMethod
+  endpoint     String                @default("")
+  authKey      String?
+  authValue    String?
+  alertMessage String
+  profile      Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([profileId])
+  @@map("health_check_configs")
 }
