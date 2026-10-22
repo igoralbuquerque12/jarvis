@@ -30,19 +30,50 @@ export type EventSeriesType = 'UNIQUE' | 'RECURRENCE';
 
 export type RecurrenceMode = 'HOUR' | 'DAY' | 'WEEK' | 'MONTH';
 
-export type EventExecutionStatus = 'PENDING' | 'PROCESSING';
+export type EventExecutionStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED';
 
 export interface UpcomingEvent {
   id: string;
   content: string;
   scheduledAt: string;
   status: EventExecutionStatus;
+  /** Failure reason; only set when `status` is `FAILED`. */
+  observabilitys: string | null;
   series: {
     id: string;
     type: EventSeriesType;
     recurrenceInterval: number | null;
     recurrenceMode: RecurrenceMode | null;
   };
+}
+
+export type EventListTab = 'upcoming' | 'past';
+
+export interface EventPage {
+  items: UpcomingEvent[];
+  total: number;
+  page: number;
+  limit: number;
+  counts: { upcoming: number; past: number };
+}
+
+export interface CreateEventPayload {
+  type: EventSeriesType;
+  /** Local date-time without offset (`2026-10-23T09:00`), read in the profile timezone. */
+  startAt: string;
+  content: string;
+  recurrenceInterval?: number;
+  recurrenceMode?: RecurrenceMode;
+}
+
+export interface UpdateEventPayload {
+  content?: string;
+  startAt?: string;
 }
 
 // ── Finance ──────────────────────────────────────────────────────────────────
