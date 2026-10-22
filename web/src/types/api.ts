@@ -194,3 +194,40 @@ export interface ApiKey {
 export interface CreatedApiKey extends ApiKey {
   secret: string;
 }
+
+// ── Health check ─────────────────────────────────────────────────────────────
+
+export type HealthCheckHttpMethod = 'GET' | 'POST';
+
+export interface HealthCheckConfig {
+  id: string;
+  name: string;
+  url: string;
+  httpMethod: HealthCheckHttpMethod;
+  endpoint: string;
+  authKey: string | null;
+  hasAuthValue: boolean;
+  alertMessage: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateHealthCheckConfigPayload {
+  name: string;
+  url: string;
+  httpMethod: HealthCheckHttpMethod;
+  endpoint?: string;
+  authKey?: string;
+  authValue?: string;
+  alertMessage: string;
+}
+
+export interface UpdateHealthCheckConfigPayload {
+  name?: string;
+  url?: string;
+  httpMethod?: HealthCheckHttpMethod;
+  endpoint?: string;
+  authKey?: string | null;
+  authValue?: string | null;
+  alertMessage?: string;
+}
