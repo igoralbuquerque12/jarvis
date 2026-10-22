@@ -238,6 +238,7 @@ model HealthCheckConfig {
   authKey      String?
   authValue    String?
   alertMessage String
+  active       Boolean               @default(true)
   profile      Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt

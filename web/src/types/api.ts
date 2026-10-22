@@ -208,6 +208,7 @@ export interface HealthCheckConfig {
   authKey: string | null;
   hasAuthValue: boolean;
   alertMessage: string;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -230,4 +231,5 @@ export interface UpdateHealthCheckConfigPayload {
   authKey?: string | null;
   authValue?: string | null;
   alertMessage?: string;
+  active?: boolean;
 }
