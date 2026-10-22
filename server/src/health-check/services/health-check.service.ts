@@ -125,6 +125,7 @@ export class HealthCheckService {
         ...(data.alertMessage !== undefined
           ? { alertMessage: data.alertMessage.trim() }
           : {}),
+        ...(data.active !== undefined ? { active: data.active } : {}),
         authKey: nextAuthKey,
         authValue: nextAuthValue,
       },
@@ -162,6 +163,7 @@ export class HealthCheckService {
 
     const configs = await this.prisma.healthCheckConfig.findMany({
       where: {
+        active: true,
         profile: {
           active: true,
         },
