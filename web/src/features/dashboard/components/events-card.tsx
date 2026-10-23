@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Alert } from '../../../components/ui/alert';
 import { Badge } from '../../../components/ui/badge';
 import { IconButton } from '../../../components/ui/button';
@@ -112,9 +113,16 @@ export function EventsCard({
         title="Próximos lembretes"
         subtitle="O que o Jarvis vai te enviar no WhatsApp."
         aside={
-          !locked && events.length > 0 ? (
-            <Badge variant="accent">{events.length}</Badge>
-          ) : undefined
+          locked ? undefined : (
+            <>
+              {events.length > 0 ? (
+                <Badge variant="accent">{events.length}</Badge>
+              ) : null}
+              <Link to="/lembretes" className="btn btn--ghost btn--sm">
+                Ver todos
+              </Link>
+            </>
+          )
         }
       />
 
