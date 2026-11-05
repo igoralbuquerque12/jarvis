@@ -15,7 +15,7 @@ cp server/.env.example server/.env
 nano server/.env
 ```
 
-No arquivo `server/.env`, cole a `DATABASE_URL` de pooler fornecida pelo Neon (ela deve conter `sslmode=require`). Preencha tambem `WHATSAPP_AUTH_ENCRYPTION_KEY` e `ASSISTANT_WORKFLOW_KEY`.
+No arquivo `server/.env`, cole a `DATABASE_URL` de pooler fornecida pelo Neon (ela deve conter `sslmode=require`). Preencha tambem `WHATSAPP_AUTH_ENCRYPTION_KEY` e `ASSISTANT_WORKFLOW_KEY`. Defina ainda `AI_PROVIDER` (`openai` ou `groq`) e a chave do provedor escolhido (`OPENAI_API_KEY` ou `GROQ_API_KEY`): sem ela o servidor nao sobe.
 
 Depois suba o projeto:
 
