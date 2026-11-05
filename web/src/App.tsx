@@ -4,6 +4,7 @@ import { RequireAuth } from './components/layout/require-auth';
 import { LoginPage } from './features/auth/login-page';
 import { ResetPasswordPage } from './features/auth/reset-password-page';
 import { DashboardPage } from './features/dashboard/dashboard-page';
+import { EventsPage } from './features/events/events-page';
 import { FinanceShell } from './features/finance/finance-shell';
 import { FinanceGoalsPage } from './features/finance/pages/finance-goals-page';
 import { FinanceInvestmentsPage } from './features/finance/pages/finance-investments-page';
@@ -44,6 +45,14 @@ export default function App() {
         element={
           <ProtectedPage>
             <DashboardPage />
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/lembretes"
+        element={
+          <ProtectedPage>
+            <EventsPage />
           </ProtectedPage>
         }
       />

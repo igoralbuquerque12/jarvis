@@ -3894,3 +3894,89 @@ details summary {
   font-weight: 600;
   color: #fff;
 }
+
+/* ------------------------------------------------------------
+   Lembretes — linhas da lista (usa .tx-group / .tx-list)
+   ------------------------------------------------------------ */
+
+.ev-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  transition: background-color 0.1s ease;
+}
+
+.ev-row:hover {
+  background: var(--accent-faint);
+}
+
+.ev-row__time {
+  padding-top: 1px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.ev-row--done .ev-row__time {
+  color: var(--ink-faint);
+}
+
+.ev-row__body {
+  min-width: 0;
+}
+
+.ev-row__content {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.93rem;
+  overflow-wrap: anywhere;
+}
+
+.ev-row--done .ev-row__content {
+  color: var(--ink-soft);
+}
+
+.ev-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ev-row__failure {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.ev-row__actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.ev-row:hover .ev-row__actions,
+.ev-row:focus-within .ev-row__actions {
+  opacity: 1;
+}
+
+@media (max-width: 600px) {
+  .ev-row {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 8px;
+  }
+
+  .ev-row__actions {
+    grid-column: 2;
+    justify-content: flex-end;
+    opacity: 1;
+  }
+}

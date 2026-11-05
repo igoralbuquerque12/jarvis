@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { PrivacyProvider } from '../../features/finance/context/privacy-context';
 import { authClient } from '../../lib/auth-client';
 import {
+  IconBell,
   IconGrid,
   IconLayers,
   IconLogout,
@@ -43,6 +44,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavLink to="/dashboard" className={navLinkClass}>
               <IconGrid />
               <span>Painel</span>
+            </NavLink>
+            <NavLink to="/lembretes" className={navLinkClass}>
+              <IconBell />
+              <span>Lembretes</span>
             </NavLink>
             <NavLink to="/financas" className={navLinkClass}>
               <IconWallet />

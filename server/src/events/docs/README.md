@@ -77,7 +77,43 @@ enviada ao n8n quando o plano do usuário a inclui.
 
 Lista execuções `PENDING` ou `PROCESSING` de séries ativas do perfil da sessão,
 ordenadas por `scheduledAt`. Cada item traz `id`, `content`, `scheduledAt`,
-`status` e `series` (`id`, `type`, `recurrenceInterval`, `recurrenceMode`).
+`status`, `observabilitys` e `series` (`id`, `type`, `recurrenceInterval`,
+`recurrenceMode`). Sem paginação: alimenta o painel.
+
+### `GET /events/me/list`
+
+Lista paginada para a página **Lembretes** do web. Query (todos opcionais):
+
+- `tab`: `upcoming` (padrão; `PENDING`/`PROCESSING`, do mais próximo ao mais
+  distante) ou `past` (`COMPLETED`/`FAILED`/`CANCELLED`, do mais recente ao mais
+  antigo).
+- `q`: busca no texto (sem diferenciar maiúsculas).
+- `type`: `UNIQUE` ou `RECURRENCE`.
+- `status`: `COMPLETED`, `FAILED` ou `CANCELLED`; só vale na aba `past`.
+- `page` (padrão 1) e `limit` (padrão 25, máx. 100).
+
+Resposta: `{ items, total, page, limit, counts: { upcoming, past } }`. Os
+`counts` respeitam `q` e `type`, mas ignoram `tab` e `status`, para que os
+contadores das abas não mudem ao trocar de aba. Uma série recorrente tem só uma
+execução pendente por vez; cada disparo já feito vira uma linha em `past`.
+`observabilitys` traz o motivo quando `status = FAILED`.
+
+### `POST /events/me`
+
+Cria um lembrete para o perfil da sessão. Corpo: `type`, `startAt`, `content`
+(até 1000 caracteres) e, para `RECURRENCE`, `recurrenceInterval` e
+`recurrenceMode`. `startAt` sem fuso é lido no fuso do perfil e arredondado para
+10 minutos, como nos eventos criados pelo assistente; datas no passado
+respondem `400`. Delega para `EventsM2mService.createEvent`.
+
+### `PATCH /events/me/:executionId`
+
+Edita `content` e/ou `startAt` de um lembrete **pendente**. `404` se a execução
+não for do perfil; `409` se já foi enviada, cancelada ou está sendo enviada, ou
+se a série já tem um lembrete naquele horário. Em série recorrente a mudança
+vale também para as próximas ocorrências (o scheduler as calcula a partir desta
+execução). Mudar o intervalo da recorrência não é suportado: cancele e recrie.
+O cache do scheduler é sempre invalidado.
 
 ### `DELETE /events/me/series/:seriesId`
 
