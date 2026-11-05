@@ -54,7 +54,7 @@ WhatsApp is the primary interface; there is no chat UI.
 
 `assistant/tools/main.tools.ts` exports `ASSISTANT_TOOLS`, an array of `AssistantTool` descriptors (module, description, endpoints with method/path/whenToUse/request/response and structured `operations[]` with params/examples) shipped to n8n on every message and rendered into the system prompt. `rpcToolName` on an endpoint means the module is a single n8n tool taking `operation` + `data` (finance); without it each operation is its own n8n tool with typed `$fromAI` fields (events). Adding a capability for the assistant means: build the `*-m2m` controller, describe the operation here, and add/adjust the tool node in `n8n.json`. `main.tools.spec.ts` asserts the catalogue's shape — update it when you add a tool.
 
-M2M endpoints (`/events-m2m/*`, `/finance-m2m/*`) are guarded by `WhatsappAdminGuard` (`WHATSAPP_ADMIN_API_KEY` via `x-api-key`, `x-admin-key`, `x-whatsapp-admin-key` or `Authorization: Bearer`) and should still only be reached over the private `jarvis-internal` Docker network. Never expose them publicly. Both `execute` endpoints accept `data` as an object or as a JSON string (n8n's `$fromAI` json type rejects empty objects).
+M2M endpoints (`/events-m2m/*`, `/finance-m2m/*`, `/knowledge-m2m/*`) are guarded by `WhatsappAdminGuard` (`WHATSAPP_ADMIN_API_KEY` via `x-api-key`, `x-admin-key`, `x-whatsapp-admin-key` or `Authorization: Bearer`) and should still only be reached over the private `jarvis-internal` Docker network. Never expose them publicly. Both `execute` endpoints accept `data` as an object or as a JSON string (n8n's `$fromAI` json type rejects empty objects).
 
 ### Events (scheduling)
 
@@ -86,6 +86,12 @@ A `databaseHooks.user.create.after` hook calls `ProfileService.ensureAuthProfile
 
 - **Client routes (web session, `/v1` API key):** `@RequiresPlan(n)` on a controller or a route (route wins). It sets metadata + `PlanGuard`, which delegates to `PlanAccessService`: caller = `request.apiKeyProfile`, else the better-auth session; no identity → 401, plan too low → 403 `{ code: 'plan_required', requiredPlan, currentPlan }`. `SubscriptionModule` is `@Global()`, so no module import is needed. With `@UseGuards(ApiKeyGuard)` on the same class, write `@RequiresPlan` **above** it so the key is resolved first.
 - **M2M (n8n):** no plan guard. `AssistantToolsService.forPlan(plan)` filters `ASSISTANT_TOOLS` by `minPlan` (on the tool and, optionally, on each operation) before building the directive and the `tools` payload, so the model only sees what the user's plan unlocks.
+
+### AI and knowledge bases
+
+`ai/` is the only place the backend talks to an LLM directly (the assistant itself still runs in n8n). `AiProvider` (abstract class, also the DI token) is the vendor-neutral contract: `extract({ content, instructions, schema })` validated by Zod. `openai/` and `groq/` are adapters over the OpenAI-compatible `/chat/completions` (plain `fetch`); `AiModule` picks one by `AI_PROVIDER` and wraps it in `AiService`, a decorator that retries only `AiProviderError`s flagged `retryable`. Models, base URLs, timeout and retry policy are constants, not env. Consumers import `AiModule` and inject `AiProvider`; the chosen provider's API key is asserted on boot.
+
+`database-information/` stores up to 10 text bases per profile (`/database-information/me`, session-protected). Create/update call the LLM inside the request to extract `name` and `description`; on failure it answers 502 and saves nothing. See `database-information/docs/README.md`. The assistant reads them through the `database_information` tool (`POST /knowledge-m2m/:profileId/database-information/execute`; `knowledge-m2m` is the general prefix, one path per source, audit comes later). Every message ships `knowledge: [{ id, name, description }]` in the n8n payload; n8n renders it as `<bases_de_conhecimento>` so the model picks a base by description and passes the `id`.
 
 ### Persistence
 
