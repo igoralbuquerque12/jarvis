@@ -27,6 +27,7 @@ export class OpenaiProvider implements AiProvider {
     content,
     instructions,
     schema,
+    timeoutMs,
   }: AiExtractRequest<T>): Promise<T> {
     // OpenAI strict mode rejects `$schema`; it also requires every property to
     // be required, so schemas should use `.nullable()` instead of `.optional()`.
@@ -37,7 +38,7 @@ export class OpenaiProvider implements AiProvider {
       provider: 'openai',
       baseUrl: OPENAI_BASE_URL,
       apiKey: this.apiKey(),
-      timeoutMs: AI_TIMEOUT_MS,
+      timeoutMs: timeoutMs ?? AI_TIMEOUT_MS,
       body: {
         model: OPENAI_MODEL,
         temperature: 0,

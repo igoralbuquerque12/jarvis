@@ -27,6 +27,7 @@ export class GroqProvider implements AiProvider {
     content,
     instructions,
     schema,
+    timeoutMs,
   }: AiExtractRequest<T>): Promise<T> {
     // `json_object` works on every Groq model, while `json_schema` only on a
     // few. So the schema goes in the prompt and Zod enforces it afterwards.
@@ -36,7 +37,7 @@ export class GroqProvider implements AiProvider {
       provider: 'groq',
       baseUrl: GROQ_BASE_URL,
       apiKey: this.apiKey(),
-      timeoutMs: AI_TIMEOUT_MS,
+      timeoutMs: timeoutMs ?? AI_TIMEOUT_MS,
       body: {
         model: GROQ_MODEL,
         temperature: 0,
