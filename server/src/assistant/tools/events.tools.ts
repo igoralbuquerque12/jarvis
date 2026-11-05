@@ -17,8 +17,6 @@ export const EVENTS_TOOL: AssistantTool = {
     'Lembretes, rotinas e mensagens agendadas. Cada evento é uma mensagem que o Jarvis envia ao usuário no WhatsApp na data e hora combinadas.',
   whenToUse:
     'Quando o usuário quiser ser lembrado de algo, criar uma rotina, ver o que está agendado ou cancelar um lembrete.',
-  path: '/events-m2m/:profileId/execute',
-  dataEncoding: 'json-string',
   minPlan: PLAN_FEATURE_MIN_PLAN.eventsManagement,
   operations: [
     {
