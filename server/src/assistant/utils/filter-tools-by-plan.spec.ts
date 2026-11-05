@@ -17,7 +17,6 @@ const tool = (
   name,
   description: name,
   whenToUse: name,
-  path: `/${name}`,
   minPlan,
   operations,
 });

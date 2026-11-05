@@ -1,10 +1,10 @@
+import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import { ASSISTANT_TOOLS } from '../tools/main.tools';
 import {
-  buildDirective,
   buildTemporalContext,
+  GENERIC_TOOL_NAME,
   renderToolsReference,
 } from './build-system-prompt';
-import { buildToolSchemas } from './build-tool-schemas';
 
 describe('buildTemporalContext', () => {
   const reference = new Date('2026-09-10T17:30:00.000Z');
@@ -46,18 +46,26 @@ describe('renderToolsReference', () => {
     );
     expect(reference).toContain('- date (string "YYYY-MM-DD", obrigatório)');
     expect(reference).toContain('- eventSeriesId (uuid, obrigatório)');
-    expect(reference).toContain('Campos: nenhum; envie data={}.');
+    expect(reference).toContain('Campos: nenhum; envie data="{}".');
+  });
+
+  it('tells the model every tool goes through the generic n8n tool', () => {
+    expect(reference.startsWith('# Ferramentas disponíveis')).toBe(true);
+    expect(reference).toContain(
+      `acionadas pela ferramenta ${GENERIC_TOOL_NAME}`,
+    );
+    expect(reference).toContain('"tool"');
+    expect(reference).toContain('"operation"');
+    expect(reference).toContain('"data"');
   });
 });
 
-describe('buildDirective', () => {
-  const directive = buildDirective(ASSISTANT_TOOLS);
+describe('DEFAULT_DIRECTIVE', () => {
+  const directive = DEFAULT_DIRECTIVE;
 
-  it('starts with the role and ends with the tools reference', () => {
+  it('starts with the role and leaves the tool reference to the tools endpoint', () => {
     expect(directive.startsWith('# Papel e objetivo')).toBe(true);
-    expect(directive.indexOf('# Exemplos')).toBeLessThan(
-      directive.indexOf('# Ferramentas disponíveis'),
-    );
+    expect(directive).not.toContain('# Ferramentas disponíveis');
   });
 
   it('contains the behaviour contract sections exactly once', () => {
@@ -85,36 +93,5 @@ describe('buildDirective', () => {
     ]) {
       expect(directive).toContain(code);
     }
-  });
-});
-
-describe('buildToolSchemas', () => {
-  const schemas = buildToolSchemas(ASSISTANT_TOOLS);
-
-  it('produces one schema per tool with the operation enum', () => {
-    expect(schemas.map((schema) => schema.name)).toEqual(
-      ASSISTANT_TOOLS.map((tool) => tool.name),
-    );
-
-    const events = schemas.find((schema) => schema.name === 'events');
-    const properties = events?.schema.properties as Record<string, unknown>;
-    const operation = properties.operation as { enum: string[] };
-
-    expect(operation.enum).toEqual([
-      'create_event',
-      'find_active_events',
-      'delete_event',
-    ]);
-  });
-
-  it('uses a serialized JSON string for RPC tool data', () => {
-    const finance = schemas.find((schema) => schema.name === 'finance');
-    const properties = finance?.schema.properties as Record<
-      string,
-      { type: string; description: string }
-    >;
-
-    expect(properties.data.type).toBe('string');
-    expect(properties.data.description).toContain('JSON serializado');
   });
 });

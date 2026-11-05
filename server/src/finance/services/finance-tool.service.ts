@@ -1,17 +1,10 @@
-import {
-  Body,
-  Controller,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  UseFilters,
-  UseGuards,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import { AssistantToolGuard } from '../../assistant/guards/assistant-tool.guard';
-import { ExecuteOperationDto } from '../../core/dto/execute-operation.dto';
+import {
+  AssistantToolHandler,
+  AssistantToolHandlerFor,
+} from '../../assistant/tools/tool-handler';
 import { unsupportedOperation } from '../../core/errors/m2m.errors';
-import { M2mExceptionFilter } from '../../core/filters/m2m-exception.filter';
 import { requireUuid } from '../../core/utils/require-uuid.util';
 import { validateDto } from '../../core/utils/validate-dto.util';
 
@@ -41,14 +34,13 @@ import { FindTransactionsDto } from '../transactions/dto/find-transactions.dto';
 import { UpdateTransactionDto } from '../transactions/dto/update-transaction.dto';
 
 /**
- * Single endpoint behind all finance tools (accounts, transactions,
- * categories, rules, goals, recurring_transactions, assets). Operation
- * names are unique across tools, so the route stays the same for all.
+ * Handler of the `finance` assistant tool: accounts, transactions,
+ * categories, rules, goals, recurring transactions and assets. Operation
+ * names are unique across the whole catalogue.
  */
-@UseGuards(AssistantToolGuard)
-@UseFilters(M2mExceptionFilter)
-@Controller('finance-m2m')
-export class FinanceM2mController {
+@Injectable()
+@AssistantToolHandlerFor('finance')
+export class FinanceToolService implements AssistantToolHandler {
   constructor(
     private readonly accountsService: AccountsService,
     private readonly assetsService: AssetsService,
@@ -59,13 +51,11 @@ export class FinanceM2mController {
     private readonly transactionsService: TransactionsService,
   ) {}
 
-  @Post(':profileId/execute')
   async execute(
-    @Param('profileId', ParseUUIDPipe) profileId: string,
-    @Body() body: ExecuteOperationDto,
+    profileId: string,
+    operation: string,
+    data: Record<string, unknown>,
   ) {
-    const { operation, data = {} } = body;
-
     switch (operation) {
       // Accounts
       case 'list_accounts':
@@ -85,7 +75,7 @@ export class FinanceM2mController {
         return this.transactionsService.createTransaction(profileId, dto);
       }
       case 'update_transaction': {
-        const { transactionId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'transactionId');
         const transactionId = requireUuid(data, 'transactionId');
         const dto = await validateDto(UpdateTransactionDto, rest);
         return this.transactionsService.updateTransaction(
@@ -108,7 +98,7 @@ export class FinanceM2mController {
         return this.categoriesService.createCategory(profileId, dto);
       }
       case 'update_category': {
-        const { categoryId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'categoryId');
         const categoryId = requireUuid(data, 'categoryId');
         const dto = await validateDto(UpdateCategoryDto, rest);
         return this.categoriesService.updateCategory(
@@ -131,7 +121,7 @@ export class FinanceM2mController {
         return this.rulesService.createRule(profileId, dto);
       }
       case 'update_rule': {
-        const { ruleId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'ruleId');
         const ruleId = requireUuid(data, 'ruleId');
         const dto = await validateDto(UpdateRuleDto, rest);
         return this.rulesService.updateRule(profileId, ruleId, dto);
@@ -152,7 +142,7 @@ export class FinanceM2mController {
         return this.goalsService.createGoal(profileId, dto);
       }
       case 'update_goal': {
-        const { goalId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'goalId');
         const goalId = requireUuid(data, 'goalId');
         const dto = await validateDto(UpdateGoalDto, rest);
         return this.goalsService.updateGoal(profileId, goalId, dto);
@@ -176,7 +166,7 @@ export class FinanceM2mController {
         );
       }
       case 'update_recurring_transaction': {
-        const { recurringTransactionId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'recurringTransactionId');
         const recurringTransactionId = requireUuid(
           data,
           'recurringTransactionId',
@@ -202,7 +192,7 @@ export class FinanceM2mController {
         return this.assetsService.createAsset(profileId, dto);
       }
       case 'add_asset_value': {
-        const { assetId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'assetId');
         const assetId = requireUuid(data, 'assetId');
         const dto = await validateDto(CreateAssetValueDto, rest);
         return this.assetsService.addAssetValue(profileId, assetId, dto);
@@ -213,7 +203,7 @@ export class FinanceM2mController {
           requireUuid(data, 'assetId'),
         );
       case 'record_asset_trade': {
-        const { assetId: _ignored, ...rest } = data;
+        const rest = withoutKey(data, 'assetId');
         const assetId = requireUuid(data, 'assetId');
         const dto = await validateDto(CreateAssetTradeDto, rest);
         return this.assetsService.createAssetTrade(profileId, assetId, dto);
@@ -228,4 +218,14 @@ export class FinanceM2mController {
         throw unsupportedOperation(operation);
     }
   }
+}
+
+/** `data` minus the id that travels as a separate argument. */
+function withoutKey(
+  data: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).filter(([entryKey]) => entryKey !== key),
+  );
 }

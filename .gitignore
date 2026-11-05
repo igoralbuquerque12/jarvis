@@ -5,6 +5,6 @@ ui ux/
 
 images/
 .agents/
+.claude/
 
 compose.override.yml
-n8n.json

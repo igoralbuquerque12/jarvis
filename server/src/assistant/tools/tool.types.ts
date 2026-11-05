@@ -1,8 +1,9 @@
 /**
- * Tool catalogue types. Each `AssistantTool` becomes one tool exposed to the
- * model (8 in total). The same structure renders the prompt reference
- * (build-system-prompt.ts) and the JSON schemas used to configure typed
- * tool nodes in n8n (build-tool-schemas.ts).
+ * Tool catalogue types. Each `AssistantTool` is one tool of the catalogue the
+ * model reads in the prompt (build-system-prompt.ts). n8n exposes a single
+ * generic tool (`executar_ferramenta`) that receives `tool` + `operation` +
+ * `data`; the backend routes it to the handler registered under `name`
+ * (see tool-handler.ts), so a new tool needs no change in n8n.
  */
 export type ToolFieldType =
   'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object';
@@ -33,14 +34,13 @@ export type ToolOperation = {
 };
 
 export type AssistantTool = {
-  /** Tool name as the model sees it, e.g. "transactions". */
+  /**
+   * Tool name as the model sees it, e.g. "events". Must match the name of
+   * exactly one `@AssistantToolHandlerFor` provider (checked on boot).
+   */
   name: string;
   description: string;
   whenToUse: string;
-  /** Backend endpoint the n8n tool node must call (profileId from context). */
-  path: string;
-  /** n8n RPC tools receive the operation payload as a serialized JSON string. */
-  dataEncoding?: 'object' | 'json-string';
   /**
    * Minimum plan to expose the tool (defaults to the free tier). Profiles
    * below it never see the tool in the catalogue sent to n8n.

@@ -94,6 +94,7 @@ model Profile {
   apiKeys            ApiKey[]
   healthCheckConfigs HealthCheckConfig[]
   databaseInformations DatabaseInformation[]
+  assistantRuns        AssistantRun[]
   createdAt          DateTime            @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -116,15 +117,43 @@ model Subscription {
 }
 
 model Message {
-  id        String      @id @default(uuid()) @db.Uuid
+  id        String        @id @default(uuid()) @db.Uuid
   userId    String
   content   String
   type      MessageType
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  runId     String?       @db.Uuid
+  run       AssistantRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   @@index([userId])
+  @@index([runId])
   @@map("messages")
+}
+
+/// One processing of an inbound WhatsApp message that passed triage (has a
+/// profile). The unique (profileId, waMessageId) pair is the idempotency
+/// guard: a redelivered message hits P2002 and is skipped.
+model AssistantRun {
+  id          String             @id @default(uuid()) @db.Uuid
+  profileId   String             @db.Uuid
+  waMessageId String
+  status      AssistantRunStatus @default(PROCESSING)
+  error       String?
+  profile     Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  startedAt   DateTime           @default(now())
+  finishedAt  DateTime?
+
+  @@unique([profileId, waMessageId])
+  @@index([status, startedAt])
+  @@map("assistant_runs")
+}
+
+enum AssistantRunStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum MessageType {

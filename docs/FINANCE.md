@@ -57,16 +57,19 @@ model SecuroAccount {
 ```
 finance/
   finance.module.ts                       # imports: AuthModule (forwardRef), ProfileModule
-  constants/                              # chaves de cache, defaults (BRL, pt-BR), vocabulário Securo
-  entities/securo-api.schemas.ts          # Zod para as respostas críticas do Securo (auth/workspace/conta)
+  core/
+    constants/                            # chaves de cache, defaults (BRL, pt-BR), vocabulário Securo
+    entities/securo-api.schemas.ts        # Zod para as respostas críticas do Securo (auth/workspace/conta)
+    services/
+      securo-api.service.ts               # client HTTP baixo nível (fetch, Bearer, X-Workspace-Id, erros -> Nest exceptions)
+      securo-provisioning.service.ts      # cria contas Securo, tokens, bootstrap do admin
+      securo-context.service.ts           # contexto por perfil (token + workspace), com o ensure lazy
   services/
-    securo-api.service.ts                 # client HTTP baixo nível (fetch, Bearer, X-Workspace-Id, erros -> Nest exceptions)
-    securo-provisioning.service.ts        # cria contas Securo, tokens, bootstrap do admin
-    finance.service.ts                    # operações de domínio por profileId (traduz DTO -> payload Securo)
-  controllers/
-    finance-m2m.controller.ts             # /finance-m2m/:profileId/... (n8n, sem auth — rede interna)
-    finance.controller.ts                 # /finance/me/... (front, sessão better-auth)
-  dto/                                    # 17 DTOs class-validator (create/update/find por área)
+    finance-tool.service.ts               # handler da ferramenta `finance` do assistente (@AssistantToolHandlerFor('finance'))
+  accounts/ transactions/ categories/ rules/ goals/ recurring-transactions/ assets/
+    controllers/                          # /finance/me/... (front, sessão better-auth)
+    services/                             # operações de domínio por profileId (traduz DTO -> payload Securo)
+    dto/                                  # DTOs class-validator (create/update/find por área)
 ```
 
 #### Provisionamento automático (o "em segundo plano")
@@ -97,12 +100,12 @@ finance/
 
 Duas fachadas com os mesmos recursos:
 
-- **M2M para o n8n** (sem auth de app, protegido pela rede interna — mesmo modelo do `events-m2m`): `/finance-m2m/:profileId/...`
+- **Ferramenta `finance` para o n8n**: não há rota própria. O n8n chama `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool: "finance", operation, data }` (guard `AssistantToolGuard`, chave `ASSISTANT_WORKFLOW_KEY`, só na rede interna) e o `FinanceToolService` faz o `switch` da operação para o service da área. O `profileId` vem da run, nunca do modelo.
 - **Front com sessão** (better-auth, padrão `requireSession` + `ensureAuthProfile`): `/finance/me/...`
 
-Acesso por plano: os controllers `/finance/me/*` têm `@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)` (plano inferior → `403 { code: 'plan_required' }`). O M2M não passa pelo guard; a tool `finance` tem o mesmo `minPlan` e só é enviada ao n8n quando o plano do usuário a inclui (uma operação pode ter `minPlan` próprio, acima do da tool).
+Acesso por plano: os controllers `/finance/me/*` têm `@RequiresPlan(PLAN_FEATURE_MIN_PLAN.fullFinanceManagement)` (plano inferior → `403 { code: 'plan_required' }`). A ferramenta não passa pelo `PlanGuard`; ela tem o mesmo `minPlan`, só é enviada ao n8n quando o plano do usuário a inclui (uma operação pode ter `minPlan` próprio, acima do da tool), e o backend refaz essa checagem a cada execução (fora do plano → `unsupported_operation`).
 
-| Área | Rotas (sufixo após o prefixo) |
+| Área | Rotas web (sufixo após `/finance/me`) |
 |---|---|
 | Contas | `GET/POST .../accounts` |
 | Transações | `POST/GET .../transactions`, `PATCH/DELETE .../transactions/:transactionId` |
@@ -116,7 +119,7 @@ O `GET .../transactions` aceita `from`, `to`, `type`, `categoryId`, `accountId`,
 
 ### 5. Tools do assistente (`assistant/tools/finance.tools.ts`)
 
-O módulo é publicado em `ASSISTANT_TOOLS` como **uma única tool `finance`** (`rpcToolName: 'finance'`), com os campos `operation` (nome exato da operação) e `data` (parâmetros da operação; o n8n envia como string JSON e o backend aceita objeto ou string). Cada operação é descrita de forma estruturada (quando usar, campos com tipo e obrigatoriedade, exemplo, observações) e essa descrição é renderizada no system prompt por `assistant/utils/build-system-prompt.ts`. Ver `ASSISTANT.md` para o desenho do prompt.
+O módulo é publicado em `ASSISTANT_TOOLS` como **uma única tool `finance`**: o modelo a aciona pela ferramenta genérica `executar_ferramenta` do n8n, com `tool: "finance"`, `operation` (nome exato da operação) e `data` (parâmetros da operação; o n8n envia como string JSON e o backend aceita objeto ou string). Cada operação é descrita de forma estruturada (quando usar, campos com tipo e obrigatoriedade, exemplo, observações) e essa descrição é renderizada por `renderToolsReference` (`assistant/utils/build-system-prompt.ts`) na referência que o n8n busca em `GET /assistant-m2m/runs/:runId/tools`. Ver a seção 6 do [`ARCHITECTURE.md`](ARCHITECTURE.md) para o desenho do prompt.
 
 | Área | Operações |
 |---|---|
@@ -150,7 +153,8 @@ E opcionalmente, na raiz (interpolação do compose): `SECURO_SECRET_KEY=<segred
 
 - `finance.service.spec.ts` — mapeamento de payloads (conta padrão, dinheiro como string, snake_case, PATCH só com campos enviados, defaults BRL).
 - `securo-provisioning.service.spec.ts` — curto-circuito de conta ACTIVE, fluxo completo de provisioning, marcação de FAILED, cache de token.
-- `main.tools.spec.ts` — catálogo completo das operações financeiras na tool RPC `finance`, que usa `/finance-m2m/:profileId`.
+- `main.tools.spec.ts` — catálogo completo das operações financeiras na tool RPC `finance`.
+- `finance-tool.service.spec.ts` — roteamento das operações para os services, id separado do resto de `data`, operação desconhecida.
 
 `npm test`: 6 suítes, 34 testes passando. `npm run build` e `npm run lint` limpos.
 

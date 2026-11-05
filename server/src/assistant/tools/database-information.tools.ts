@@ -1,17 +1,12 @@
 import { AssistantTool, uuidField } from './tool.types';
 
-/**
- * Knowledge queries live under `/knowledge-m2m/:profileId/<source>/execute`,
- * one path per source (today only the user's text bases; audit comes later).
- */
+/** The user's text knowledge bases (see database-information/). */
 export const DATABASE_INFORMATION_TOOL: AssistantTool = {
   name: 'database_information',
   description:
     'Bases de conhecimento em texto que o usuário cadastrou (listas, documentos, anotações). Cada base aparece em <bases_de_conhecimento> com id, nome e descrição; o conteúdo só pode ser obtido por esta ferramenta.',
   whenToUse:
     'Quando o pedido do usuário puder ser respondido por alguma base listada em <bases_de_conhecimento>, escolhida pela descrição.',
-  path: '/knowledge-m2m/:profileId/database-information/execute',
-  dataEncoding: 'json-string',
   operations: [
     {
       name: 'get_database_information',

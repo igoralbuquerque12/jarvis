@@ -1,28 +1,27 @@
-import { DatabaseInformationM2mController } from './database-information-m2m.controller';
-import { DatabaseInformationService } from '../services/database-information.service';
+import { DatabaseInformationToolService } from './database-information-tool.service';
+import { DatabaseInformationService } from './database-information.service';
 
-describe('DatabaseInformationM2mController', () => {
+describe('DatabaseInformationToolService', () => {
   const profileId = '0f0c2b3e-8f7a-4d0e-9a3b-2c1d4e5f6a7b';
   const databaseInformationId = '5f0c2b3e-8f7a-4d0e-9a3b-2c1d4e5f6a7b';
 
-  function makeController() {
+  function makeHandler() {
     const service = {
       findOneForAssistant: jest.fn().mockResolvedValue({ id: 'x' }),
     };
-    const controller = new DatabaseInformationM2mController(
+    const handler = new DatabaseInformationToolService(
       service as unknown as DatabaseInformationService,
     );
 
-    return { controller, service };
+    return { handler, service };
   }
 
   it('reads a base for get_database_information', async () => {
-    const { controller, service } = makeController();
+    const { handler, service } = makeHandler();
 
     await expect(
-      controller.execute(profileId, {
-        operation: 'get_database_information',
-        data: { databaseInformationId },
+      handler.execute(profileId, 'get_database_information', {
+        databaseInformationId,
       }),
     ).resolves.toEqual({ id: 'x' });
     expect(service.findOneForAssistant).toHaveBeenCalledWith(
@@ -32,12 +31,11 @@ describe('DatabaseInformationM2mController', () => {
   });
 
   it('rejects a missing or malformed id as validation_error', async () => {
-    const { controller, service } = makeController();
+    const { handler, service } = makeHandler();
 
     await expect(
-      controller.execute(profileId, {
-        operation: 'get_database_information',
-        data: { databaseInformationId: 'nope' },
+      handler.execute(profileId, 'get_database_information', {
+        databaseInformationId: 'nope',
       }),
     ).rejects.toMatchObject({
       fields: { databaseInformationId: expect.any(String) as string },
@@ -46,10 +44,12 @@ describe('DatabaseInformationM2mController', () => {
   });
 
   it('rejects an unknown operation', async () => {
-    const { controller } = makeController();
+    const { handler } = makeHandler();
 
     await expect(
-      controller.execute(profileId, { operation: 'delete_everything' }),
-    ).rejects.toBeDefined();
+      handler.execute(profileId, 'delete_everything', {}),
+    ).rejects.toMatchObject({
+      response: { code: 'unsupported_operation' },
+    });
   });
 });

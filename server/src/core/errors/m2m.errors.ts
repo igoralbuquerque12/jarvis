@@ -50,6 +50,18 @@ export function unsupportedOperation(operation: string): BadRequestException {
   });
 }
 
+/**
+ * Raised when the model asks for a tool the catalogue does not have, or that
+ * the user's plan does not unlock. Same code as a wrong operation: the fix is
+ * the same (pick one from the listed tools).
+ */
+export function unsupportedTool(tool: string): BadRequestException {
+  return new BadRequestException({
+    code: 'unsupported_operation',
+    message: `Ferramenta "${tool}" não está disponível.`,
+  });
+}
+
 function flattenValidationErrors(
   errors: ValidationError[],
   prefix = '',

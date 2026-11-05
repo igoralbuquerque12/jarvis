@@ -80,7 +80,7 @@ O projeto é um monorepo com backend NestJS, frontend React, um workflow n8n ver
 
 **6. Segurança em camadas.** Três mecanismos de autenticação distintos para três públicos (sessão para a web, API key com hash SHA-256 para sistemas externos, chave administrativa com comparação em tempo constante para a rede interna), credenciais do WhatsApp cifradas com AES-256-GCM no banco, e nenhuma porta de serviço interno publicada no host.
 
-**7. Duas fachadas para o mesmo domínio.** Cada capacidade (eventos, finanças) é exposta duas vezes: `/*-m2m/:profileId/*` para o agente na rede privada e `/*/me/*` para a web com sessão, onde o `profileId` nunca vem do cliente.
+**7. Duas fachadas para o mesmo domínio.** Cada capacidade (eventos, finanças) é exposta duas vezes: como ferramenta do agente, executada pelo endpoint único `/assistant-m2m/runs/:runId/tools/execute` na rede privada (o perfil vem da run), e como `/*/me/*` para a web com sessão. Em nenhuma das duas o `profileId` vem do cliente.
 
 ---
 
@@ -148,10 +148,10 @@ O `Profile` é o pivô de tudo. Ele é criado por um hook do better-auth no cada
 
 1. O socket Baileys emite `messages.upsert`. O receiver só aceita `type === 'notify'` (mensagens novas, não histórico) e descarta mensagens enviadas pelo próprio número ou sem texto.
 2. `AssistantMainService` procura um `Profile` pelo `jid`. **Sem perfil**, o serviço de conexão procura um token de 10 caracteres na mensagem e, se encontrar, pareia a conta. Esse é todo o onboarding.
-3. **Com perfil**, carrega as últimas 10 mensagens, persiste a mensagem atual e monta o payload: diretiva (prompt + catálogo de ferramentas, calculado uma vez por processo), `profileId`, o texto `about` do perfil, o histórico enxuto e a data/hora em dois formatos no fuso do usuário.
-4. O payload vai por `POST` para o webhook do n8n, autenticado por `x-api-key`.
-5. O n8n valida, monta o prompt final com blocos XML, roda o **AI Agent** (até 8 iterações) e, a cada tool call, chama `POST /events-m2m/:profileId/execute` ou `POST /finance-m2m/:profileId/execute` com `{ operation, data }`. Um `400` de validação volta para o modelo como texto e ele corrige os argumentos.
-6. A resposta `{ response }` é validada com Zod, persistida como mensagem do tipo `AI` e enviada de volta pelo mesmo socket.
+3. **Com perfil**, abre uma *run* (`assistant_runs`, única por perfil + id da mensagem no WhatsApp: uma reentrega é ignorada sem chamar o n8n) e persiste a mensagem atual ligada a ela.
+4. O backend faz `POST` no webhook do n8n, autenticado por `x-api-key`, enviando **apenas `{ runId }`**.
+5. O n8n busca pelo `runId` o contexto (`GET /assistant-m2m/runs/:runId/context`: diretiva, `about` do perfil, mensagem atual, as 10 anteriores, índice das bases de conhecimento e data/hora no fuso do usuário) e as ferramentas do plano (`GET /assistant-m2m/runs/:runId/tools`), monta o prompt com blocos XML e roda o **AI Agent** (até 8 iterações). A cada tool call, a ferramenta única `executar_ferramenta` chama `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool, operation, data }`. Um `400` de validação volta para o modelo como texto e ele corrige os argumentos.
+6. A resposta `{ response }` é validada com Zod, persistida como mensagem do tipo `AI`, enviada de volta pelo mesmo socket, e a run é marcada `COMPLETED` (ou `FAILED`, com o motivo, se algo der errado).
 
 O diagrama de onboarding e os detalhes de cada etapa estão no [documento de arquitetura](ARCHITECTURE.md).
 
@@ -187,9 +187,9 @@ jarvis/
 │   ├── src/
 │   │   ├── main.ts            # bootstrap: better-auth montado ANTES do express.json()
 │   │   ├── app.module.ts
-│   │   ├── assistant/         # loop de mensagens, prompt, catálogo de tools, cliente do n8n
+│   │   ├── assistant/         # loop de mensagens, runs, prompt, catálogo de tools, /assistant-m2m, cliente do n8n
 │   │   ├── whatsapp/          # socket Baileys, receiver, sender, auth store cifrado, admin guard
-│   │   ├── events/            # séries, execuções, scheduler (@Cron), M2M e endpoints web
+│   │   ├── events/            # séries, execuções, scheduler (@Cron), ferramenta events e endpoints web
 │   │   ├── finance/           # core (Securo client, provisioning) + 7 submódulos de domínio
 │   │   ├── api-keys/          # ciclo de vida das chaves jrv_ + ApiKeyGuard
 │   │   ├── public-api/        # /v1/* (protegido por API key)
@@ -198,7 +198,7 @@ jarvis/
 │   │   ├── subscription/      # planos (Free Tier padrão)
 │   │   ├── messages/          # histórico de conversa
 │   │   ├── prisma/ redis/     # módulos globais de infraestrutura
-│   │   └── core/              # ExecuteOperationDto + validateDto (RPC dos M2M)
+│   │   └── core/              # ExecuteOperationDto, validateDto, erros e filtro M2M (RPC das ferramentas)
 │   ├── Dockerfile             # multi-stage: builder → production
 │   └── .env.example
 ├── web/                       # Frontend React + Vite
@@ -295,8 +295,8 @@ docker run -d --name n8n -p 127.0.0.1:5678:5678 \
 Em `http://localhost:5678`:
 
 1. Importe [`n8n.json`](../n8n.json).
-2. Crie a credencial **Groq** e a credencial **Header Auth** com o header `x-api-key`. O valor precisa ser igual a `ASSISTANT_WORKFLOW_KEY` (o webhook valida com ele) **e** a `WHATSAPP_ADMIN_API_KEY` (as tools chamam os endpoints M2M com a mesma credencial). Na prática: use o mesmo valor nas duas variáveis, ou crie uma segunda credencial para os quatro nós de tool.
-3. Nos quatro nós de tool, troque `http://server:3000` por `http://host.docker.internal:3000` (dev local).
+2. Crie a credencial **Groq** e a credencial **Header Auth** com o header `x-api-key` e o valor de `ASSISTANT_WORKFLOW_KEY`. A mesma credencial serve para o webhook (o backend envia essa chave) e para os nós *Get context*, *Get tools* e `executar_ferramenta` (os endpoints `/assistant-m2m/*` validam com ela).
+3. No nó *Config*, aponte `baseUrl` para `http://host.docker.internal:3000` (dev local) ou `http://server:3000` (rede interna).
 4. Ative o workflow. O nó Webhook expõe o caminho `assistant`, então no `server/.env`:
 
 ```dotenv
@@ -353,9 +353,9 @@ node docs/diagrams/render.mjs            # re-renderiza os diagramas desta docum
 | `WEB_ORIGIN` | **sim** | Origem do frontend, usada no CORS (`credentials: true`) e em `trustedOrigins`. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | não | Habilitam o login com Google. Sem eles, só e-mail/senha. |
 | `WHATSAPP_AUTH_ENCRYPTION_KEY` | **sim** | 32 bytes em base64. Cifra as credenciais do Baileys no banco. **Perder essa chave obriga a escanear o QR de novo.** |
-| `WHATSAPP_ADMIN_API_KEY` | **sim** | Chave dos endpoints administrativos e M2M (`/whatsapp/*`, `/events-m2m/*`, `/finance-m2m/*`). |
+| `WHATSAPP_ADMIN_API_KEY` | **sim** | Chave dos endpoints administrativos (`/whatsapp/*`). |
 | `ASSISTANT_WORKFLOW_URL` | **sim** | URL do webhook do n8n. Em produção `http://n8n:5678/webhook/assistant`. |
-| `ASSISTANT_WORKFLOW_KEY` | **sim** | Enviada como `x-api-key` para o webhook. Deve bater com a credencial Header Auth do n8n. |
+| `ASSISTANT_WORKFLOW_KEY` | **sim** | Enviada como `x-api-key` para o webhook e exigida nos endpoints que o n8n chama (`/assistant-m2m/*`). Deve bater com a credencial Header Auth do n8n. |
 | `AI_PROVIDER` | **sim** | Provedor de IA da extração de bases de conhecimento: `openai` ou `groq`. |
 | `OPENAI_API_KEY` / `GROQ_API_KEY` | **sim** (a do provedor escolhido) | Sem a chave do provedor em `AI_PROVIDER`, o servidor não sobe. |
 | `SECURO_API_URL` | **sim** | `http://localhost:8000` em dev. O compose injeta `http://securo-backend:8000`. |
@@ -407,7 +407,7 @@ As suítes unitárias cobrem:
 | Área | Suítes | O que garantem |
 |---|---|---|
 | Eventos | `get-next-scheduled-at`, `events-m2m.service`, `events.schedule` | Arredondamento para 10 min (empate arredonda para frente), próxima ocorrência sempre no futuro e no fuso certo, validação de recorrência, claim/estados do scheduler, invalidação do cache. |
-| Assistente | `main.tools`, `build-system-prompt` | Forma do catálogo de tools (todo módulo aponta para `/*-m2m/:profileId`), renderização do prompt, contexto temporal com offset. |
+| Assistente | `main.tools`, `build-system-prompt`, `assistant-main.service`, `assistant-run.service`, `assistant-tool-dispatcher.service`, `assistant-tool-registry.service` | Forma do catálogo de tools (nomes únicos), renderização da referência de ferramentas, contexto temporal com offset, idempotência e estados da run, checagem de plano a cada execução, boot falhando sem handler. |
 | Finanças | 7 suítes de domínio + `securo-provisioning.service` | Tradução DTO → payload do Securo (dinheiro como string, snake_case, PATCH só com campos enviados, defaults BRL), curto-circuito de conta ativa, fluxo completo de provisioning, marcação `FAILED`, cache de token. |
 | Chaves de API | `generate-api-key`, `extract-api-key`, `api-keys.service`, `api-key.guard` | Formato `jrv_`, hash, limite por perfil, recusa de chave inativa/perfil inativo, `lastUsedAt` best-effort. |
 | API pública | `public-api.service` | `409` quando o perfil não pareou o WhatsApp. |

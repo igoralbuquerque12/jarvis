@@ -9,7 +9,7 @@ O server concentra o domínio e as integrações de backend:
 - autenticação web por sessão com better-auth;
 - perfis, assinaturas e pareamento de usuários com o WhatsApp;
 - recebimento e envio de mensagens com Baileys;
-- montagem do contexto do assistente e comunicação com o workflow n8n;
+- runs do assistente (uma por mensagem recebida, idempotentes), contexto e ferramentas servidos ao workflow n8n;
 - eventos, recorrências e execução agendada de lembretes;
 - integração financeira com a API interna do Securo;
 - criação e validação de chaves `jrv_…`;
@@ -36,7 +36,7 @@ server/
 │   └── seed.ts             # seed opcional de perfil
 ├── src/
 │   ├── api-keys/           # chaves da API pública
-│   ├── assistant/          # prompt, tools e cliente do n8n
+│   ├── assistant/          # runs, prompt, tools, /assistant-m2m e cliente do n8n
 │   ├── auth/               # better-auth e sessões
 │   ├── core/               # contratos compartilhados
 │   ├── events/             # lembretes, recorrência e scheduler
@@ -101,9 +101,9 @@ Use [`.env.example`](.env.example) como base.
 | `WEB_ORIGIN` | Origem permitida pelo CORS e pelo better-auth. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Login Google opcional. |
 | `WHATSAPP_AUTH_ENCRYPTION_KEY` | Chave de 32 bytes em base64 que cifra a sessão do WhatsApp. |
-| `WHATSAPP_ADMIN_API_KEY` | Protege endpoints administrativos e M2M. |
+| `WHATSAPP_ADMIN_API_KEY` | Protege os endpoints administrativos (`/whatsapp`). |
 | `ASSISTANT_WORKFLOW_URL` | Webhook do agente no n8n. |
-| `ASSISTANT_WORKFLOW_KEY` | Chave enviada pelo server ao webhook. |
+| `ASSISTANT_WORKFLOW_KEY` | Chave enviada pelo server ao webhook e exigida nos endpoints que o n8n chama (`/assistant-m2m`). |
 | `AI_PROVIDER` | Provedor de IA usado na extração de bases de conhecimento (`openai` ou `groq`). |
 | `OPENAI_API_KEY`, `GROQ_API_KEY` | Chave do provedor escolhido; sem ela o server não sobe. |
 | `SECURO_API_URL` | Base da API interna do Securo. |
@@ -115,15 +115,16 @@ Consulte a seção global de [variáveis de ambiente](../docs/README.md#variáve
 
 ## Superfícies HTTP
 
-O backend expõe três tipos de interface:
+O backend expõe quatro tipos de interface:
 
 | Público | Autenticação | Prefixos principais |
 |---|---|---|
 | Painel web | cookie de sessão | `/api/auth`, `/profile/me`, `/events/me`, `/finance/me`, `/api-keys/me` |
-| Agente e administração | `x-admin-key` | `/whatsapp`, `/events-m2m`, `/finance-m2m` |
+| Agente (n8n) | `x-api-key` ou `Authorization: Bearer` com `ASSISTANT_WORKFLOW_KEY` | `/assistant-m2m/runs/:runId/*` |
+| Administração | `x-admin-key` com `WHATSAPP_ADMIN_API_KEY` | `/whatsapp` |
 | Integrações externas | `Authorization: Bearer jrv_…` | `/v1` |
 
-Os endpoints de finanças com sessão nunca recebem o `profileId` do cliente; ele é obtido da sessão. As rotas M2M recebem o perfil explicitamente e são destinadas à rede interna.
+Os endpoints com sessão nunca recebem o `profileId` do cliente; ele é obtido da sessão. As rotas do agente também não: recebem só o `runId`, o perfil vem da run (que só vale enquanto está `PROCESSING`), e são destinadas à rede interna. Todas as ferramentas do assistente passam por `POST /assistant-m2m/runs/:runId/tools/execute`.
 
 ## Banco e Prisma
 

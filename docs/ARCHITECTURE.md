@@ -140,11 +140,11 @@ As migrations do Jarvis rodam num container separado (`migrate`) que usa o **mes
 | `AuthModule` | Instância do better-auth, sessão, hooks de criação de usuário. | `BetterAuthService` (`instance`, `getSession`, `requireSession`). |
 | `ProfileModule` | O `Profile`: criação a partir do usuário autenticado, token de pareamento, view para a web. | `ProfileService.ensureAuthProfile`, `toProfileMeView`. |
 | `SubscriptionModule` | Planos. Garante o Free Tier. | `SubscriptionService.ensureDefaultSubscription`. |
-| `MessagesModule` | Histórico de conversa por perfil. | `MessagesService.findAll({ userId, take })`. |
+| `MessagesModule` | Histórico de conversa por perfil. | `MessagesService.findAll({ userId, take, before })`, `findUserMessageOfRun(runId)`. |
 | `WhatsappModule` | Socket Baileys, recepção, envio, credenciais cifradas, guard administrativo. | `WhatsappConnectionService`, `WhatsappReceiverService`, `WhatsappSenderService`, `BaileysAuthStore`, `WhatsappAuthCryptoService`, `WhatsappAdminGuard`. |
-| `AssistantModule` | O loop de mensagens, o prompt, o catálogo de ferramentas, o cliente do n8n e o pareamento. | `AssistantMainService`, `AssistantWorkflowService`, `AssistantConnectionService`, `ASSISTANT_TOOLS`, `buildDirective`. |
-| `EventsModule` | Séries e execuções, scheduler, endpoints M2M e web. | `EventsSchedule` (`@Cron`), `EventsM2mService`, `EventSeriesService`, `EventExecutionService`. |
-| `FinanceModule` | Cliente do Securo, provisioning, contexto por perfil, 7 submódulos de domínio, fachada M2M. | `SecuroApiService`, `SecuroProvisioningService`, `SecuroContextService`, `FinanceM2mController`, `*Service` por área. |
+| `AssistantModule` | O loop de mensagens, as runs, o prompt, o catálogo de ferramentas, os endpoints M2M que o n8n chama (`/assistant-m2m/runs/*`), o cliente do n8n e o pareamento. | `AssistantMainService`, `AssistantRunService`, `AssistantContextService`, `AssistantM2mController`, `AssistantToolRegistry`, `AssistantToolDispatcherService`, `AssistantWorkflowService`, `AssistantConnectionService`, `ASSISTANT_TOOLS`. |
+| `EventsModule` | Séries e execuções, scheduler, handler da ferramenta `events` e endpoints web. | `EventsSchedule` (`@Cron`), `EventsM2mService`, `EventsToolService`, `EventSeriesService`, `EventExecutionService`. |
+| `FinanceModule` | Cliente do Securo, provisioning, contexto por perfil, 7 submódulos de domínio, handler da ferramenta `finance`. | `SecuroApiService`, `SecuroProvisioningService`, `SecuroContextService`, `FinanceToolService`, `*Service` por área. |
 | `ApiKeysModule` | Ciclo de vida das chaves e o guard de API key. | `ApiKeysService`, `ApiKeyGuard`, `@ApiKeyProfile()`. |
 | `PublicApiModule` | Rotas públicas `/v1/*`. | `PublicApiController`, `PublicApiService`. |
 
@@ -157,8 +157,8 @@ Os outros `forwardRef` (`Auth ⇄ Profile`, `Auth → Finance`) existem porque o
 ### 4.3 Convenções que sustentam a modularidade
 
 - Cada módulo segue `controllers/ services/ dto/ entities/ utils/ schedules/ tests/`. Testes ficam colocados no módulo (`rootDir` do Jest é `src`).
-- **Duas fachadas por capacidade.** Eventos e finanças expõem um controller M2M (`/*-m2m/:profileId/execute`, guard administrativo, `profileId` na rota) e um controller web (`/*/me/*`, sessão, `profileId` resolvido da sessão). Ambos chamam os mesmos services.
-- **RPC nos M2M.** Em vez de um endpoint REST por operação, os M2M recebem `{ operation, data }` (`ExecuteOperationDto`) e fazem `switch` para o DTO certo, validando com `validateDto()` (`plainToInstance` + `validateOrReject`). Isso reduziu dezenas de nós no n8n a quatro.
+- **Duas fachadas por capacidade.** Eventos e finanças expõem um handler de ferramenta do assistente (`*ToolService`, chamado pelo endpoint único `/assistant-m2m/runs/:runId/tools/execute`, `profileId` vindo da run) e um controller web (`/*/me/*`, sessão, `profileId` resolvido da sessão). Ambos chamam os mesmos services.
+- **RPC nas ferramentas.** Em vez de um endpoint REST por operação, cada handler recebe `operation` + `data` e faz `switch` para o DTO certo, validando com `validateDto()` (`plainToInstance` + `validateOrReject`). Os handlers são descobertos no boot (seção 6.4), o que reduziu os nós de ferramenta do n8n a um só.
 - **Validação em duas famílias.** DTOs internos usam class-validator (integrados ao `ValidationPipe` global com `whitelist`, `forbidNonWhitelisted`, `transform`). Payloads externos (a resposta do n8n, as respostas críticas do Securo) usam Zod. A regra: *o que entra de fora é parseado, o que trafega dentro é declarado.*
 - **Idioma.** Strings para o usuário, prompts e docs de módulo em pt-BR; identificadores, comentários novos e commits em inglês.
 
@@ -187,37 +187,44 @@ O receiver não valida nem decide nada além disso; ele normaliza para `Incoming
 - **Sem perfil**: `AssistantConnectionService.connectionAttempt` procura um token com a regex `\b[A-Za-z0-9]{10}\b`. Se existir um `Profile` com aquele `token`, o `jid` do remetente é gravado nele e o Jarvis responde confirmando. Qualquer outra mensagem de um número desconhecido é ignorada com um `warn` no log. Não há resposta para desconhecidos, de propósito: evita virar um bot que responde a qualquer número.
 - **Com perfil**: segue o loop.
 
-### 5.3 Contexto e persistência
+### 5.3 A run e a persistência
 
-O histórico (`MessagesService.findAll`, 10 mais recentes, ordem decrescente) é carregado **antes** de persistir a mensagem atual, para que ela não apareça duplicada em `lastMessages` e `currentMessage`. O histórico é reduzido a `{ type, content, createdAt }`.
+Com perfil, `AssistantRunService.start(profileId, waMessageId)` abre uma `AssistantRun` (tabela `assistant_runs`) com `status = PROCESSING`. O `waMessageId` é o `key.id` da mensagem no Baileys, e `@@unique([profileId, waMessageId])` é a guarda de idempotência: se o Baileys reentregar a mesma mensagem, o `INSERT` falha com `P2002`, `start` devolve `null` e a mensagem é ignorada sem chamar o n8n. Mensagens de números sem perfil (pareamento) nunca abrem run.
 
-A mensagem atual é gravada como `type = user`. A tabela `messages` usa `userId` para guardar o `profile.id` (nome legado; não há FK).
+Em seguida a mensagem atual é gravada como `type = user` com o `runId`. A tabela `messages` usa `userId` para guardar o `profile.id` (nome legado; não há FK) e ganhou `runId` opcional (FK com `onDelete: SetNull`).
 
 ### 5.4 O payload para o n8n
 
-`ReceiveMessageWorkflowInput`:
+`ReceiveMessageWorkflowInput` é só `{ runId }`. O n8n busca o resto de volta pelo `runId`, então o payload não cresce com novos campos de contexto ou novas ferramentas.
+
+`GET /assistant-m2m/runs/:runId/context` (`AssistantContextService.getContext`):
 
 | Campo | Origem | Observação |
 |---|---|---|
-| `directive` | `buildDirective(ASSISTANT_TOOLS)` | Prompt estático + referência de ferramentas renderizada. Calculado **uma vez por processo** (constante de módulo). |
-| `profileId` | `profile.id` | Vai para a rota dos M2M. |
+| `directive` | `DEFAULT_DIRECTIVE` | Só o prompt estático (`guideline.config.ts`), sem a referência de ferramentas. |
 | `profileContext` | `profile.about` | Texto livre que o usuário edita no perfil ("sou dev, moro em SP, tenho dois filhos..."). |
-| `currentMessage` | texto recebido | |
-| `lastMessages` | histórico | Mais recente primeiro. |
-| `tools` | `ASSISTANT_TOOLS` | O catálogo bruto, para consumidores que queiram montar tools dinamicamente. O workflow atual usa a versão renderizada em `directive`. |
+| `currentMessage` | mensagem `user` da run | `MessagesService.findUserMessageOfRun(runId)`. |
+| `lastMessages` | histórico | As 10 mensagens anteriores à atual (`before` = `createdAt` da mensagem da run), mais recente primeiro, reduzidas a `{ type, content, createdAt }`. |
+| `knowledge` | `DatabaseInformationService.findIndexByProfile` | `[{ id, name, description }]`. Vazio quando o plano não inclui a ferramenta `database_information`. |
 | `now`, `nowHuman`, `timezone` | `buildTemporalContext(profile.timezone)` | `2026-09-10T14:30:00-03:00` e `quinta-feira, 10 de setembro de 2026 às 14:30`. Fuso inválido cai para `America/Sao_Paulo`. |
+
+O `profileId` não é enviado: ele fica na run e o backend o resolve em cada chamada.
+
+`GET /assistant-m2m/runs/:runId/tools` devolve `{ tools, reference }`: o catálogo filtrado pelo plano do perfil e o mesmo catálogo renderizado em Markdown (`# Ferramentas disponíveis`, por `renderToolsReference`). O resultado é cacheado em memória por número de plano.
+
+Os dois endpoints (e o de execução, seção 6.4) só aceitam uma run que existe e ainda está `PROCESSING`: run inexistente responde `not_found`, run finalizada responde `conflict`.
 
 `AssistantWorkflowService.fetch` faz `POST` com `x-api-key: ASSISTANT_WORKFLOW_KEY`, lança em status não-2xx e parseia a resposta com `ReceiveMessageWorkflowOutputSchema = z.object({ response: z.string() })`.
 
 ### 5.5 Resposta
 
-A resposta é gravada como `type = AI` e enviada por `WhatsappSenderService.sendMessage(jid, text)`. O sender lança `503 ServiceUnavailable` se o socket não está conectado e `500` se o envio falha; `AssistantMainService` captura tudo num `try/catch` único, loga e devolve `{ ok: false, error }`. Não há retry: uma falha de rede no n8n resulta em silêncio para o usuário, que naturalmente reenvia.
+A resposta é gravada como `type = AI` (com o `runId`), enviada por `WhatsappSenderService.sendMessage(jid, text)` e a run é marcada `COMPLETED` com `finishedAt`. O sender lança `503 ServiceUnavailable` se o socket não está conectado e `500` se o envio falha; `AssistantMainService` captura tudo num `try/catch` único, loga, marca a run `FAILED` com a mensagem do erro em `error` (se ela já existia) e devolve `{ ok: false, error }`. Não há retry: uma falha de rede no n8n resulta em silêncio para o usuário, que naturalmente reenvia.
 
 ### 5.6 Propriedades do loop
 
 - **Stateless por mensagem.** Todo o contexto vem do banco a cada mensagem. Reiniciar o server não perde conversa.
-- **Idempotência não garantida.** Se o Baileys reentregar a mesma mensagem, ela seria processada de novo. Na prática o filtro `notify` e o `fromMe` cobrem os casos observados.
-- **Latência.** Dominada pelo modelo (1 a 3 iterações típicas) e pelos callbacks HTTP. O backend adiciona duas leituras e duas escritas no Postgres.
+- **Idempotente por mensagem do WhatsApp.** Uma reentrega do Baileys com o mesmo `key.id` não abre segunda run nem chama o n8n. Uma run que ficou presa em `PROCESSING` (o processo caiu no meio) não é reprocessada, de propósito: refazer poderia executar uma ação duas vezes.
+- **Latência.** Dominada pelo modelo (1 a 3 iterações típicas) e pelos callbacks HTTP. O backend adiciona a abertura e o fechamento da run, duas escritas de mensagem, e os dois `GET` que o n8n faz antes de rodar o agente.
 
 ---
 
@@ -241,18 +248,21 @@ O arquivo [`n8n.json`](../n8n.json) é versionado e importável. Nós, em ordem:
 
 | Nó | Tipo | O que faz |
 |---|---|---|
-| **Webhook** | `webhook` v2.1, `POST /webhook/assistant`, Header Auth | Recebe o payload. Responde pelo nó *Respond to Webhook* (`responseMode: responseNode`). |
-| **Validate input** | `code` | Checa tipos dos campos obrigatórios e normaliza defaults. Produz `valid: boolean`. |
-| **If** | `if` | `valid` → *Build prompt*; senão → *Respond invalid* (`"Não foi possível processar a mensagem agora."`). |
-| **Build prompt** | `code` | Ordena o histórico por `createdAt`, escapa `<` e `>` do conteúdo do usuário (troca por `‹` `›`), e concatena: `directive` + `# Contexto desta conversa` com `<data_e_hora_atual>`, `<perfil_do_usuario>`, `<historico_recente>` + `# Lembrete final`. |
-| **AI Agent** | `@n8n/n8n-nodes-langchain.agent` v3.1 | `text = currentMessage`, `systemMessage = systemPrompt`, `maxIterations = 8`, `onError: continueRegularOutput`. |
+| **Webhook** | `webhook` v2.1, `POST`, Header Auth | Recebe `{ runId }`. Responde pelos nós *Respond* (`responseMode: responseNode`). |
+| **Validate input** | `code` | Aceita só um `runId` com formato de UUID. Produz `valid: boolean`. |
+| **If** | `if` | `valid` → *Config*; senão → *Respond invalid* (`400`). Qualquer resposta não-2xx do workflow (`400`, `502`) faz o backend marcar a run `FAILED`. |
+| **Config** | `code` | Define `baseUrl` do backend (`http://server:3000` na rede interna). |
+| **Get context** | `httpRequest` v4.2, `GET` | `/assistant-m2m/runs/:runId/context` com a credencial Header Auth. Falha → *Respond error* (`502`). |
+| **Get tools** | `httpRequest` v4.2, `GET` | `/assistant-m2m/runs/:runId/tools`. Falha → *Respond error* (`502`). |
+| **Build prompt** | `code` | Ordena o histórico por `createdAt`, escapa `<` e `>` do conteúdo do usuário (troca por `‹` `›`) e monta dois textos. **System prompt**: `directive` + `reference` das tools + `# Contexto desta conversa` com `<data_e_hora_atual>`, `<perfil_do_usuario>` e `<bases_de_conhecimento>`. **User prompt**: `<historico_recente>` + `<mensagem_atual>`. |
+| **Has message** | `if` | Mensagem atual vazia → *Respond empty* (`{ response: "Não foi possível processar a mensagem agora." }`); senão → *AI Agent*. |
+| **AI Agent** | `@n8n/n8n-nodes-langchain.agent` v3.1 | `text = userPrompt`, `systemMessage = systemPrompt`, `maxIterations = 8`. |
 | **Groq Chat Model** | `lmChatGroq` | `openai/gpt-oss-120b`, `temperature 0.2`. |
-| **create_event**, **find_active_events**, **delete_event** | `httpRequestTool` v4.2 | Uma tool por operação de eventos, com parâmetros tipados via `$fromAI(...)`. |
-| **finance** | `httpRequestTool` v4.2 | Uma tool única com `operation` (string) e `data` (JSON serializado em string). |
+| **executar_ferramenta** | `httpRequestTool` v4.2 | A única ferramenta do agente. Campos `tool`, `operation` e `data` (objeto JSON serializado em string) via `$fromAI(...)`; `POST /assistant-m2m/runs/:runId/tools/execute`. |
 | **Format response** | `code` | Pega `output` (ou `text`), faz `trim`, e cai num texto de desculpas se vier vazio. |
 | **Respond to Webhook** | `respondToWebhook` | `{ response }`. |
 
-Todas as tools apontam para `http://server:3000/...` (nome de serviço na rede interna), usam a credencial Header Auth e têm `neverError: true`, o que faz um `400` do backend virar *resultado* da tool em vez de erro do workflow. É esse detalhe que fecha o laço de correção: o modelo lê `"recurrenceMode must be one of HOUR, DAY, WEEK, MONTH"` e tenta de novo.
+Os nós HTTP usam `baseUrl` do *Config*, a mesma credencial Header Auth (`x-api-key: ASSISTANT_WORKFLOW_KEY`) e só levam o `runId` na rota: nem o n8n nem o modelo informam `profileId`. A ferramenta tem `neverError: true`, o que faz um `400` do backend virar *resultado* da tool em vez de erro do workflow. É esse detalhe que fecha o laço de correção: o modelo lê `{ "error": { "code": "validation_error", "fields": ... } }` e tenta de novo.
 
 ### 6.3 O system prompt em camadas
 
@@ -260,44 +270,46 @@ O prompt final tem três autores e é montado em três momentos:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ 1. DEFAULT_DIRECTIVE           (backend, estático, versionado)│
-│    # Papel e objetivo                                         │
-│    # Instruções (conversa, quando usar tools, dados           │
-│      obrigatórios, depois da tool, datas e valores)           │
-│    # Como raciocinar antes de responder                       │
-│    # Formato da resposta                                      │
-│    # Exemplos                                                 │
+│ SYSTEM PROMPT                                                 │
+│ 1. DEFAULT_DIRECTIVE   (backend, estático; GET .../context)   │
+│    # Papel e objetivo · # Como o contexto chega               │
+│    # Fontes de verdade · # Regras de operação                 │
+│    # Ferramentas e erros · # Autonomia e confirmação          │
+│    # Quando perguntar · # Critérios de conclusão              │
+│    # Datas, horários e valores · # Formato · # Exemplos       │
 ├──────────────────────────────────────────────────────────────┤
-│ 2. renderToolsReference(ASSISTANT_TOOLS)  (backend, por boot) │
-│    # Ferramentas disponíveis                                  │
-│    ## Módulo events: ...    (uma tool por operação)           │
+│ 2. renderToolsReference(tools do plano)  (GET .../tools)      │
+│    # Ferramentas disponíveis (tudo via executar_ferramenta)   │
+│    ## Ferramenta "events": ...                                │
 │    ### create_event · Quando usar · Campos · Exemplo · Obs.   │
-│    ## Módulo finance: ...   (tool única "finance")            │
-│    ### list_accounts ... ### delete_asset (27 operações)      │
+│    ## Ferramenta "finance": ... ## "database_information"     │
 ├──────────────────────────────────────────────────────────────┤
-│ 3. Contexto desta conversa            (n8n, por mensagem)     │
+│ 3. Contexto desta conversa      (n8n, com dados da run)       │
 │    <data_e_hora_atual> ... </data_e_hora_atual>               │
 │    <perfil_do_usuario> ... </perfil_do_usuario>               │
+│    <bases_de_conhecimento> [{id,name,description}]            │
+├──────────────────────────────────────────────────────────────┤
+│ USER PROMPT                     (n8n, com dados da run)       │
 │    <historico_recente> <mensagem autor="usuario">...          │
-│    # Lembrete final                                           │
+│    <mensagem_atual> ... </mensagem_atual>                     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-A estrutura segue o esqueleto recomendado pelo guia de prompting do GPT-4.1 e incorpora os três "lembretes agênticos" (persistência, uso de ferramentas sem inventar dados, planejamento antes de cada chamada). Instruções essenciais aparecem no início e no fim (a técnica de *sandwich* para contextos longos). Markdown delimita instruções, XML delimita contexto e dados; JSON não é usado como conteúdo de prompt. O histórico é apresentado como demonstração implícita, por isso o escape de tags: uma mensagem do usuário nunca consegue fechar `</historico_recente>` e injetar instruções.
+A estrutura segue o esqueleto recomendado pelo guia de prompting do GPT-4.1 e incorpora os três "lembretes agênticos" (persistência, uso de ferramentas sem inventar dados, planejamento antes de cada chamada). Instruções ficam no system prompt; tudo que o usuário ou o Jarvis disseram vai no user prompt, como dado dentro de tags. Markdown delimita instruções, XML delimita contexto e dados; o único JSON no prompt é o índice de `<bases_de_conhecimento>`. O histórico é apresentado como demonstração implícita, por isso o escape de tags: uma mensagem do usuário nunca consegue fechar `</historico_recente>` ou `</mensagem_atual>` e injetar instruções.
 
 O `ASSISTANT.md` na raiz documenta o diagnóstico que levou a este desenho (o agente respondia "significado de bom dia" porque recebia um JSON de configuração como fala do usuário e tinha tools sem descrição e sem parâmetros) e cada técnica aplicada, com referências.
 
 ### 6.4 O catálogo de ferramentas como contrato
 
-`assistant/tools/*.ts` declara `AssistantTool → AssistantToolEndpoint → AssistantToolOperation`:
+`assistant/tools/*.ts` declara `AssistantTool → ToolOperation → ToolField` (`tool.types.ts`, com fábricas como `enumField`, `uuidField`, `moneyField`). `main.tools.ts` junta tudo em `ASSISTANT_TOOLS`: hoje `events`, `finance` e `database_information`.
 
 ```ts
 {
   name: 'create_event',
   whenToUse: 'Criar um lembrete único ("me lembra amanhã às 9h de...") ou uma rotina recorrente ...',
-  params: [
-    'type (string, obrigatório): "UNIQUE" para um único envio ou "RECURRENCE" para repetição.',
-    'startAt (string, obrigatório): data e hora ... em ISO-8601 com offset ... arredondado para 10 minutos.',
+  fields: [
+    enumField('type', EVENT_TYPES, '"UNIQUE" para um único envio ou "RECURRENCE" para repetição.'),
+    { name: 'startAt', type: 'string', format: 'date-time', required: true, description: '... ISO-8601 com o offset ...' },
     ...
   ],
   example: { type: 'RECURRENCE', startAt: '2026-09-11T08:00:00-03:00', content: '...', recurrenceInterval: 1, recurrenceMode: 'DAY' },
@@ -305,14 +317,17 @@ O `ASSISTANT.md` na raiz documenta o diagnóstico que levou a este desenho (o ag
 }
 ```
 
-Duas estratégias de exposição, escolhidas por módulo com o campo `rpcToolName`:
+Uma única estratégia de exposição: o n8n tem **um nó de ferramenta genérico**, `executar_ferramenta`, com os campos `tool`, `operation` e `data`. O modelo escolhe a ferramenta e a operação pela referência renderizada no prompt (`renderToolsReference`, que explica que tudo passa por `executar_ferramenta` com `data` como JSON em texto). A precisão vem dessa referência detalhada e do feedback de validação do backend. `data` vai sempre como string JSON porque o tipo `json` do `$fromAI` rejeita objetos vazios, e várias operações não têm parâmetros.
 
-| Estratégia | Onde | Por quê |
-|---|---|---|
-| **Uma tool por operação, campos tipados** | events (3 operações) | O modelo vê um JSON Schema real para cada função e erra muito menos em campos e enums. Poucas operações, vale o nó extra no n8n. |
-| **Tool única RPC (`operation` + `data`)** | finance (27 operações) | Trinta nós no n8n seriam inviáveis de manter. A precisão vem da referência detalhada no prompt e do feedback de validação do backend. `data` vai como string JSON porque o tipo `json` do `$fromAI` rejeita objetos vazios, e várias operações não têm parâmetros. |
+No backend, a chamada chega em `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool, operation, data }` (`ExecuteToolDto`; `data` objeto ou string, parseado por `ExecuteOperationDto` com `@Transform`, e uma string inválida produz um `400` legível pelo modelo). `AssistantToolDispatcherService`:
 
-O backend aceita `data` como objeto ou string (`ExecuteOperationDto` faz o parse com `@Transform`), e uma string inválida produz um `400` legível pelo modelo. `main.tools.spec.ts` garante que todo módulo aponta para `/*-m2m/:profileId` e que a forma do catálogo não regrediu.
+1. resolve a run ativa (`not_found` / `conflict`) e o perfil dela;
+2. pega o catálogo filtrado pelo plano do perfil e recusa com `unsupported_operation` uma ferramenta fora dele ou uma operação que não pertence à ferramenta;
+3. delega para o handler registrado com aquele nome, passando o `profileId` da run.
+
+Cada módulo de domínio é dono do handler da sua ferramenta: uma classe que implementa `AssistantToolHandler` (`assistant/tools/tool-handler.ts`) marcada com `@AssistantToolHandlerFor('<nome>')`. Hoje: `EventsToolService` (`events`), `FinanceToolService` (`finance`) e `DatabaseInformationToolService` (`database_information`). O `AssistantToolRegistry` descobre os handlers com o `DiscoveryService` do Nest no boot, então o `AssistantModule` não importa os módulos de domínio; **a aplicação não sobe** se uma ferramenta de `ASSISTANT_TOOLS` ficar sem handler ou tiver dois. Adicionar uma ferramenta é: descritor em `assistant/tools/`, entrada em `main.tools.ts` e handler decorado no módulo. Nada muda no n8n.
+
+`main.tools.spec.ts` garante que a forma do catálogo não regrediu (operações publicadas em cada ferramenta, nomes de ferramenta e de operação únicos, toda operação com uso, campos e exemplo).
 
 ### 6.5 Regras de comportamento do agente
 
@@ -420,7 +435,7 @@ Consequências: um dump do banco não expõe a sessão do WhatsApp; perder a cha
 
 ### 8.5 Endpoints administrativos
 
-`/whatsapp/qr`, `/whatsapp/status` e `/whatsapp/send` ficam atrás do `WhatsappAdminGuard`. O guard aceita a chave em `x-admin-key`, `x-whatsapp-admin-key`, `x-api-key` ou `Authorization: Bearer`, e compara com `timingSafeEqual` após checar o tamanho. O mesmo guard protege os controllers M2M, o que permite que a credencial Header Auth do n8n (que envia `x-api-key`) seja reutilizada.
+`/whatsapp/qr`, `/whatsapp/status` e `/whatsapp/send` ficam atrás do `WhatsappAdminGuard`. O guard aceita a chave em `x-admin-key`, `x-whatsapp-admin-key`, `x-api-key` ou `Authorization: Bearer`, e compara com `timingSafeEqual` após checar o tamanho, usando `WHATSAPP_ADMIN_API_KEY`. Os endpoints que o n8n chama (`/assistant-m2m/runs/*`) usam outro guard, o `AssistantToolGuard`: mesma comparação em tempo constante, mas com `ASSISTANT_WORKFLOW_KEY` lida de `x-api-key` ou `Authorization: Bearer`. Assim a credencial Header Auth do n8n é a mesma chave que o backend envia ao webhook.
 
 ---
 
@@ -469,7 +484,7 @@ O fuso horário fica no `Profile`, não na série. "Todo dia às 8h" significa 8
 
 | Rota | Auth | Operações |
 |---|---|---|
-| `POST /events-m2m/:profileId/execute` | admin key | `create_event`, `find_active_events` (filtros `scheduledAt=YYYY-MM-DD` no fuso do perfil, `type`), `delete_event`, `get_guideline` |
+| `POST /assistant-m2m/runs/:runId/tools/execute` com `tool: "events"` | chave do workflow + run `PROCESSING` | `create_event`, `find_active_events` (filtros `scheduledAt=YYYY-MM-DD` no fuso do perfil, `type`), `delete_event` |
 | `GET /events/me` | sessão | Execuções `PENDING`/`PROCESSING` de séries ativas do perfil logado |
 | `DELETE /events/me/series/:id` | sessão | Desativa a série se ela pertencer ao perfil (`404` caso contrário, sem revelar existência) |
 
@@ -524,10 +539,10 @@ Os services de domínio (`AccountsService`, `TransactionsService`, ...) aplicam 
 
 | Fachada | Rota | Auth | Quem usa |
 |---|---|---|---|
-| M2M (RPC) | `POST /finance-m2m/:profileId/execute` com `{ operation, data }` | admin key | n8n |
+| Ferramenta `finance` (RPC) | `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool: "finance", operation, data }` | chave do workflow + run `PROCESSING` | n8n |
 | Web (REST) | `/finance/me/accounts`, `/finance/me/transactions[/:id]`, `/finance/me/categories`, `/rules`, `/goals`, `/recurring-transactions`, `/assets[/:id/values|trades]` | sessão | frontend |
 
-As 27 operações do RPC mapeiam 1:1 para os métodos dos services. `GET .../transactions` aceita `from`, `to`, `type`, `categoryId`, `accountId`, `q`, `page`, `limit` e devolve o envelope do Securo `{ items, total, page, limit, summary: { income, expense, net } }`. O `summary` é o que responde "quanto gastei esse mês" sem somar no cliente.
+As operações da ferramenta `finance` (`FinanceToolService`) mapeiam 1:1 para os métodos dos services. `GET .../transactions` aceita `from`, `to`, `type`, `categoryId`, `accountId`, `q`, `page`, `limit` e devolve o envelope do Securo `{ items, total, page, limit, summary: { income, expense, net } }`. O `summary` é o que responde "quanto gastei esse mês" sem somar no cliente.
 
 Decisões de segurança de produto: o endpoint destrutivo `apply-all` de regras do Securo não foi exposto; metas têm progresso manual (o modelo consulta e soma); vender mais unidades de um ativo do que se tem é rejeitado pelo próprio Securo (`422`).
 
@@ -569,7 +584,7 @@ Adicionar um endpoint público é: DTO em `dto/`, método no service, rota no co
 |---|---|---|---|
 | Pessoa no navegador | Cookie de sessão do better-auth | `/api/auth/*`, `/profile/me`, `/events/me`, `/finance/me/*`, `/api-keys/me*`, `/subscriptions` | `requireSession` explícito em cada handler; `profileId` sempre derivado da sessão; recursos de outro perfil respondem `404`, não `403`. |
 | Sistema do usuário | API key `jrv_…` | `/v1/*` | Hash SHA-256, exibida uma vez, revogável, escopo implícito (só o dono). |
-| Serviços internos (n8n, operador) | Chave administrativa estática | `/events-m2m/*`, `/finance-m2m/*`, `/whatsapp/*` | `timingSafeEqual`; **e** rede privada sem porta publicada. Duas camadas: a chave protege contra um container comprometido na rede, a rede protege contra vazamento da chave. |
+| Serviços internos (n8n, operador) | Chave estática: `ASSISTANT_WORKFLOW_KEY` (`AssistantToolGuard`) para o n8n, `WHATSAPP_ADMIN_API_KEY` (`WhatsappAdminGuard`) para o operador | `/assistant-m2m/runs/*`, `/whatsapp/*` | `timingSafeEqual`; **e** rede privada sem porta publicada. Duas camadas: a chave protege contra um container comprometido na rede, a rede protege contra vazamento da chave. Nos endpoints do n8n, o `runId` só vale enquanto a run está `PROCESSING`, então um `runId` vazado não serve para nada depois que a mensagem termina. |
 
 ### 12.2 Segredos em repouso
 
@@ -585,7 +600,8 @@ Adicionar um endpoint público é: DTO em `dto/`, método no service, rota no co
 
 O modelo recebe texto do usuário e pode chamar ferramentas. Mitigações:
 
-- **Escopo por rota.** O `profileId` das tools é interpolado pelo n8n a partir do payload validado, não gerado pelo modelo. O modelo não consegue agir sobre outro perfil.
+- **Escopo pela run.** As chamadas de ferramenta levam só o `runId` na rota; o backend resolve o perfil a partir da run, e nem o n8n nem o modelo informam `profileId`. O modelo não consegue agir sobre outro perfil.
+- **Plano checado no backend.** Além de o catálogo enviado ao n8n já vir filtrado pelo plano, o dispatcher refaz a checagem a cada execução: ferramenta fora do plano ou operação de outra ferramenta respondem `unsupported_operation`.
 - **Escape do histórico.** `<` e `>` viram `‹` e `›` antes de entrar no prompt; instruções injetadas ficam dentro de uma tag de mensagem e não conseguem escapar dela.
 - **Validação estrita.** `forbidNonWhitelisted` rejeita qualquer campo inventado; enums são fechados; ids precisam ser UUID.
 - **Limite de iterações** (8) e temperatura baixa (0,2).
@@ -608,7 +624,8 @@ TLS terminado no Traefik. CORS aceita exatamente `WEB_ORIGIN` com `credentials: 
 | `user`, `session`, `account`, `verification` | better-auth | Esquema do better-auth mapeado no Prisma. `account.password` guarda o hash para o provedor de credenciais. |
 | `profiles` | Jarvis | Pivô do domínio. `userId` é `unique` e **nullable** para permitir perfis criados por seed (sem usuário web). `token` e `jid` são `unique`. `about` alimenta o prompt. `timezone` é IANA. |
 | `subscriptions` | Jarvis | `price Decimal(10,2)`, `limit Int`. |
-| `messages` | Jarvis | `userId` (na verdade `profile.id`) indexado, sem FK. Só as 10 últimas são lidas por mensagem; a tabela cresce linearmente com o uso. |
+| `messages` | Jarvis | `userId` (na verdade `profile.id`) indexado, sem FK. `runId` opcional e indexado, FK para `assistant_runs` com `onDelete: SetNull`. Só as 10 últimas são lidas por mensagem; a tabela cresce linearmente com o uso. |
+| `assistant_runs` | Jarvis | Um processamento de mensagem recebida (seção 5.3): `profileId` (FK, `onDelete: Cascade`), `waMessageId` (o `key.id` do Baileys), `status: PROCESSING \| COMPLETED \| FAILED`, `error`, `startedAt`, `finishedAt`. `@@unique([profileId, waMessageId])` é a guarda de idempotência; índice `(status, startedAt)`. |
 | `event_series`, `event_executions` | Jarvis | Ver seção 9. `onDelete: Cascade` a partir do perfil. Índice composto `(status, scheduledAt)` serve a query de janela do scheduler. |
 | `securo_accounts` | Jarvis | 1:1 com o perfil. Guarda ids do Securo e estado do provisioning. |
 | `api_keys` | Jarvis | `hash unique`, índice em `profileId`. |
@@ -683,8 +700,8 @@ O modo privacidade (`privacy-context`) oculta valores monetários na tela inteir
 
 ### 16.2 Logs e sinais
 
-- `Logger` do Nest por classe. O loop de mensagens loga em `debug` um resumo do payload (tamanho da diretiva e número de módulos, nunca o prompt inteiro) e a resposta do workflow.
-- `event_executions.observabilitys` e `securo_accounts.observabilitys` guardam o motivo da última falha **no próprio registro**, o que permite diagnosticar sem procurar em logs.
+- `Logger` do Nest por classe. O loop de mensagens loga em `debug` a resposta do workflow de cada run e em `warn` as mensagens duplicadas ignoradas.
+- `event_executions.observabilitys`, `securo_accounts.observabilitys` e `assistant_runs.error` guardam o motivo da última falha **no próprio registro**, o que permite diagnosticar sem procurar em logs.
 - `GET /whatsapp/status` para healthcheck do socket.
 - O n8n mantém o histórico de execuções do agente com prompt, tool calls e respostas.
 
@@ -694,7 +711,7 @@ O modo privacidade (`privacy-context`) oculta valores monetários na tela inteir
 |---|---|
 | Server reinicia | Socket reconecta com as credenciais do banco; cache do scheduler é reconstruído no próximo tick; eventos vencidos durante a queda são enviados no primeiro tick (recorrências pulam para a próxima ocorrência futura). |
 | WhatsApp desconecta | Reconexão automática após 3 s; `loggedOut` limpa as credenciais e gera QR novo. Envios nesse intervalo falham com `503` (eventos ficam `FAILED`). |
-| n8n fora do ar | Mensagem não respondida; nada é perdido no banco. |
+| n8n fora do ar | Mensagem não respondida; a mensagem do usuário fica gravada e a run fica `FAILED` com o motivo. |
 | Securo fora do ar | Operações financeiras retornam erro legível; provisioning marca `FAILED` e reprovisiona depois. |
 | Redis fora do ar | Boot falha (dependência dura). Em runtime, scheduler e finanças lançam; loop de mensagens sem finanças continua. |
 
@@ -709,8 +726,11 @@ Testes unitários com Jest 30 e ts-jest, colocados em `tests/` dentro de cada m�
 | `get-next-scheduled-at.spec` | Arredondamento (empate para frente), avanço por modo e intervalo, resultado sempre no futuro, fuso horário. |
 | `events-m2m.service.spec` | Validação de recorrência (UNIQUE sem campos, RECURRENCE com ambos), normalização, invalidação do cache dentro da janela, filtros de dia no fuso do perfil. |
 | `events.schedule.spec` | Repopulação e uso do cache, claim, transições de estado, `FAILED` com motivo, criação da próxima ocorrência, tolerância a `P2002`. |
-| `build-system-prompt.spec` | Contexto temporal com offset, fallback de fuso, todas as operações renderizadas, ordem das seções. |
-| `main.tools.spec` | Forma do catálogo; todo módulo aponta para `/*-m2m/:profileId`. |
+| `build-system-prompt.spec` | Contexto temporal com offset, fallback de fuso, todas as ferramentas e operações renderizadas, instrução de usar `executar_ferramenta`, seções da diretiva sem repetição, todos os códigos de erro do filtro M2M documentados. |
+| `main.tools.spec` | Forma do catálogo; nomes de ferramenta e de operação únicos. |
+| `assistant-main.service.spec`, `assistant-run.service.spec` | Sem perfil não abre run; reentrega ignorada sem chamar o n8n (`P2002`); só `{ runId }` vai ao n8n; `COMPLETED` no sucesso, `FAILED` com motivo limitado no erro; `findActive` recusa run inexistente ou finalizada. |
+| `assistant-tool-dispatcher.service.spec`, `assistant-tool-registry.service.spec` | Handler chamado com o perfil da run; ferramenta fora do plano e operação de outra ferramenta recusadas; boot falha sem handler ou com handler duplicado; descoberta por `@AssistantToolHandlerFor`. |
+| `finance-tool.service.spec`, `database-information-tool.service.spec` | Roteamento das operações para os services, validação de ids, operação desconhecida. |
 | 7 suítes de finanças | Tradução DTO → Securo por área (conta padrão, dinheiro como string, snake_case, `PATCH` parcial, defaults). |
 | `securo-provisioning.service.spec` | Curto-circuito de `ACTIVE`, fluxo completo, `FAILED`, cache de token. |
 | `api-keys.service.spec`, `api-key.guard.spec`, `generate-api-key.spec`, `extract-api-key.spec` | Formato, hash, limite, recusas, `lastUsedAt` best-effort. |
@@ -742,8 +762,8 @@ Formato ADR resumido: contexto, decisão, consequências.
 ### ADR-3 · Catálogo de ferramentas declarado em TypeScript e renderizado no prompt
 
 **Contexto.** Tools sem descrição e regras fixas no n8n levaram a um agente que nunca usava ferramentas.
-**Decisão.** Fonte única em `assistant/tools/*.ts`, com testes de forma, renderizada em Markdown para o prompt; tools tipadas para eventos e RPC para finanças.
-**Consequências.** Adicionar uma capacidade é adicionar um `case` no controller M2M e uma entrada no catálogo. O prompt cresce com o catálogo (hoje ~30 operações documentadas), o que é aceitável para modelos com contexto longo.
+**Decisão.** Fonte única em `assistant/tools/*.ts`, com testes de forma, renderizada em Markdown para o prompt; uma única ferramenta genérica no n8n (`executar_ferramenta`) e handlers por módulo descobertos no boot.
+**Consequências.** Adicionar uma capacidade é adicionar o descritor no catálogo e um handler decorado com `@AssistantToolHandlerFor`, sem tocar no n8n; uma ferramenta sem handler impede o boot. O modelo perde o JSON Schema por função que nós tipados dariam, e a precisão passa a depender da referência no prompt e do feedback de validação. O prompt cresce com o catálogo (hoje ~30 operações documentadas), o que é aceitável para modelos com contexto longo.
 
 ### ADR-4 · Cron de 10 minutos com cache de janela, em vez de fila com delay
 
@@ -775,6 +795,12 @@ Formato ADR resumido: contexto, decisão, consequências.
 **Decisão.** DTOs com class-validator para tudo que passa pelo `ValidationPipe`; Zod para parsear respostas de serviços externos.
 **Consequências.** Duas bibliotecas de validação, cada uma no lugar onde é mais forte. O `ValidationPipe` com `forbidNonWhitelisted` dá rejeição estrita de graça; o Zod dá tipos inferidos para payloads que o Nest não vê.
 
+### ADR-9 · Uma run por mensagem, e o n8n busca tudo pelo `runId`
+
+**Contexto.** Uma reentrega do Baileys processava a mesma mensagem de novo (podendo criar um lembrete ou uma transação em dobro); o payload do webhook crescia a cada novo dado de contexto, e o `profileId` trafegava pelo n8n até as rotas das tools.
+**Decisão.** Cada mensagem que passa da triagem abre uma `AssistantRun` com `@@unique([profileId, waMessageId])`. O webhook recebe só `{ runId }`; o n8n lê contexto e ferramentas de `/assistant-m2m/runs/:runId/*` e executa tudo pelo mesmo `runId`, que só vale enquanto a run está `PROCESSING`. Sem retries.
+**Consequências.** Reentregas são descartadas no `INSERT`; contexto e ferramentas mudam sem mexer no workflow; o perfil nunca sai do backend e um `runId` antigo não dá acesso a nada. O custo: dois `GET` a mais por mensagem, e uma run presa em `PROCESSING` (o processo caiu no meio) deixa a mensagem sem resposta, de propósito, porque reprocessar poderia repetir uma ação.
+
 ---
 
 ## 19. Limitações conhecidas e evolução
@@ -786,8 +812,8 @@ Formato ADR resumido: contexto, decisão, consequências.
 | Reset de senha só loga o link | Usuário não recebe e-mail. | Provedor transacional (Resend, SES) no `sendResetPassword`. |
 | Só texto | Áudio, imagem e documentos não são interpretados. | Transcrição de áudio (Whisper via Groq) antes do loop; visão para comprovantes. |
 | Uma instância | Sem alta disponibilidade. | Ver ADR-6. |
-| Sem idempotência por `messageId` | Reentrega do Baileys processaria de novo. | Guardar `messageId` em `messages` com `unique`. |
-| Securo parcialmente exposto | Transferências, orçamentos e importação de extrato não são ferramentas. | Novos `case` no `FinanceM2mController` + entradas no catálogo. |
+| Run presa em `PROCESSING` | Se o processo cair no meio de uma mensagem, a run nunca termina e a mensagem fica sem resposta (não há reprocessamento, para não repetir ações). | Job que marca `FAILED` as runs `PROCESSING` antigas (o índice `(status, startedAt)` já serve essa query) e, se fizer sentido, avisa o usuário. |
+| Securo parcialmente exposto | Transferências, orçamentos e importação de extrato não são ferramentas. | Novos `case` no `FinanceToolService` + entradas no catálogo. |
 | Testes e2e mínimos | Endpoints M2M e web não têm cobertura de integração. | supertest contra o app com Prisma apontando para um Postgres efêmero. |
 
 ---
@@ -800,9 +826,11 @@ Formato ADR resumido: contexto, decisão, consequências.
 | **Profile** | Unidade de isolamento do Jarvis: uma pessoa, um número, um fuso, um usuário no Securo. |
 | **Token de pareamento** | 10 caracteres `[A-Z0-9]` gerados no cadastro; enviados pelo WhatsApp para vincular o número ao perfil. |
 | **M2M** | *Machine to machine*. Endpoints usados pelo n8n, protegidos por chave estática e pela rede privada. |
-| **RPC (`execute`)** | Endpoint único por módulo que recebe `{ operation, data }`. |
+| **Run** | Um processamento de mensagem recebida (`assistant_runs`), `PROCESSING → COMPLETED \| FAILED`. O `runId` é o único dado que o webhook do n8n recebe. |
+| **RPC (`execute`)** | Endpoint único `POST /assistant-m2m/runs/:runId/tools/execute`, que recebe `{ tool, operation, data }` e delega ao handler da ferramenta. |
 | **Catálogo de tools (`ASSISTANT_TOOLS`)** | Declaração tipada do que o agente pode fazer, renderizada no prompt. |
-| **Directive** | Prompt estático + catálogo renderizado; parte do payload para o n8n. |
+| **Directive** | Prompt estático (`DEFAULT_DIRECTIVE`), devolvido pelo endpoint de contexto da run; a referência de ferramentas vem à parte, do endpoint de tools. |
+| **`executar_ferramenta`** | O único nó de ferramenta do n8n; recebe `tool`, `operation` e `data` e chama o endpoint de execução. |
 | **Série / Execução** | Regra de um evento / um disparo concreto com estado. |
 | **Janela do scheduler** | 2 horas de execuções pendentes cacheadas no Redis. |
 | **Securo** | Gestor financeiro open source vendorizado como motor interno. |

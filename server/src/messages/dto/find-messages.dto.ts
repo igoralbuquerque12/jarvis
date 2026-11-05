@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDate, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class FindMessagesDto {
   @IsOptional()
@@ -10,4 +10,10 @@ export class FindMessagesDto {
 
   @IsString()
   userId: string;
+
+  /** Only messages created strictly before this instant. */
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  before?: Date;
 }
