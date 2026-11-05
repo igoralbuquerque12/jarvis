@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { MessageType } from '@prisma/client';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { CreateMessageDto } from '../dto/create-message.dto';
 import { FindMessagesDto } from '../dto/find-messages.dto';
@@ -12,13 +13,21 @@ export class MessagesService {
     return this.prisma.message.create({ data });
   }
 
-  findAll({ take, userId }: FindMessagesDto) {
+  findAll({ take, userId, before }: FindMessagesDto) {
     if (!take) take = 5;
 
     return this.prisma.message.findMany({
-      where: { userId },
+      where: { userId, ...(before && { createdAt: { lt: before } }) },
       orderBy: { createdAt: 'desc' },
       take,
+    });
+  }
+
+  /** The inbound user message persisted for an assistant run. */
+  findUserMessageOfRun(runId: string) {
+    return this.prisma.message.findFirst({
+      where: { runId, type: MessageType.user },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
