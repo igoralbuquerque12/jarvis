@@ -7,3 +7,4 @@ images/
 .agents/
 
 compose.override.yml
+n8n.json
