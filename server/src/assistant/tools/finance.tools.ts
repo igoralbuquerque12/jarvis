@@ -25,8 +25,6 @@ import {
   uuidField,
 } from './tool.types';
 
-const FINANCE_PATH = '/finance-m2m/:profileId/execute';
-
 const typeField = (description: string, required = true) =>
   enumField('type', SECURO_TRANSACTION_TYPES, description, required);
 
@@ -36,7 +34,6 @@ export const ACCOUNTS_TOOL: AssistantTool = {
     'Contas do usuário: carteira, conta bancária, cartão de crédito, poupança e conta de investimento.',
   whenToUse:
     'Quando o usuário quiser ver ou cadastrar contas, ou quando uma operação de outra ferramenta precisar de um accountId.',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'list_accounts',
@@ -64,7 +61,6 @@ export const TRANSACTIONS_TOOL: AssistantTool = {
     'Gastos e receitas do usuário: registrar, consultar totais e extratos, corrigir e excluir lançamentos.',
   whenToUse:
     'Quando o usuário relatar um gasto ou uma entrada, perguntar "quanto gastei", pedir um extrato ou quiser corrigir ou apagar um lançamento.',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'create_transaction',
@@ -150,7 +146,6 @@ export const CATEGORIES_TOOL: AssistantTool = {
   description: 'Categorias de gastos e receitas (Mercado, Transporte, Pets).',
   whenToUse:
     'Quando precisar de um categoryId para categorizar algo ou quando o usuário quiser ver, criar, renomear ou excluir categorias.',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'list_categories',
@@ -200,7 +195,6 @@ export const RULES_TOOL: AssistantTool = {
     'Regras automáticas: transações que batem com um padrão recebem categoria, favorecido ou nota automaticamente.',
   whenToUse:
     'Quando o usuário pedir automação do tipo "tudo que tiver Uber vai pra Transporte", ou quiser ver, alterar ou excluir regras.',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'list_rules',
@@ -313,7 +307,6 @@ export const GOALS_TOOL: AssistantTool = {
   description: 'Metas de economia e seu progresso.',
   whenToUse:
     'Quando o usuário quiser juntar dinheiro para algo, registrar um aporte, ou ver, alterar, pausar, concluir ou excluir metas.',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'list_goals',
@@ -383,7 +376,6 @@ export const RECURRING_TRANSACTIONS_TOOL: AssistantTool = {
     'Salário, assinaturas e contas fixas: o sistema lança a transação automaticamente quando vence.',
   whenToUse:
     'Quando o usuário falar de salário, assinatura, conta fixa ou qualquer valor que se repete ("recebo 4 mil todo dia 5", "pago 40 de Netflix por mês").',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'list_recurring_transactions',
@@ -469,7 +461,6 @@ export const ASSETS_TOOL: AssistantTool = {
     'Investimentos e bens: ações, ETFs, cripto, fundos, imóveis, veículos; valores atualizados e compras/vendas.',
   whenToUse:
     'Quando o usuário falar de investimentos, patrimônio, compra ou venda de ativos, ou quiser atualizar o valor de um bem.',
-  path: FINANCE_PATH,
   operations: [
     {
       name: 'list_assets',
@@ -552,9 +543,9 @@ export const ASSETS_TOOL: AssistantTool = {
 };
 
 /**
- * The n8n workflow exposes finance as one RPC tool. Keep the backend
- * catalogue in the same shape: the operation selects the domain action and
- * data carries its arguments.
+ * Finance is a single tool for the model: the operation selects the domain
+ * action and data carries its arguments. The per-domain descriptors above
+ * only group the operations.
  */
 export const FINANCE_TOOL: AssistantTool = {
   name: 'finance',
@@ -562,8 +553,6 @@ export const FINANCE_TOOL: AssistantTool = {
     'Contas, transações, categorias, regras automáticas, metas, recorrências e investimentos do usuário.',
   whenToUse:
     'Quando o usuário quiser consultar, criar, alterar ou excluir qualquer dado financeiro.',
-  path: FINANCE_PATH,
-  dataEncoding: 'json-string',
   minPlan: PLAN_FEATURE_MIN_PLAN.fullFinanceManagement,
   operations: [
     ...ACCOUNTS_TOOL.operations,
