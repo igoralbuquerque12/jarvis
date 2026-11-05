@@ -104,6 +104,8 @@ Use [`.env.example`](.env.example) como base.
 | `WHATSAPP_ADMIN_API_KEY` | Protege endpoints administrativos e M2M. |
 | `ASSISTANT_WORKFLOW_URL` | Webhook do agente no n8n. |
 | `ASSISTANT_WORKFLOW_KEY` | Chave enviada pelo server ao webhook. |
+| `AI_PROVIDER` | Provedor de IA usado na extração de bases de conhecimento (`openai` ou `groq`). |
+| `OPENAI_API_KEY`, `GROQ_API_KEY` | Chave do provedor escolhido; sem ela o server não sobe. |
 | `SECURO_API_URL` | Base da API interna do Securo. |
 | `SECURO_ADMIN_EMAIL`, `SECURO_ADMIN_PASSWORD` | Credenciais administrativas do Securo. |
 | `SECURO_PROVISION_SECRET` | Segredo para derivar as credenciais de cada perfil no Securo. |

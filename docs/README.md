@@ -356,6 +356,8 @@ node docs/diagrams/render.mjs            # re-renderiza os diagramas desta docum
 | `WHATSAPP_ADMIN_API_KEY` | **sim** | Chave dos endpoints administrativos e M2M (`/whatsapp/*`, `/events-m2m/*`, `/finance-m2m/*`). |
 | `ASSISTANT_WORKFLOW_URL` | **sim** | URL do webhook do n8n. Em produção `http://n8n:5678/webhook/assistant`. |
 | `ASSISTANT_WORKFLOW_KEY` | **sim** | Enviada como `x-api-key` para o webhook. Deve bater com a credencial Header Auth do n8n. |
+| `AI_PROVIDER` | **sim** | Provedor de IA da extração de bases de conhecimento: `openai` ou `groq`. |
+| `OPENAI_API_KEY` / `GROQ_API_KEY` | **sim** (a do provedor escolhido) | Sem a chave do provedor em `AI_PROVIDER`, o servidor não sobe. |
 | `SECURO_API_URL` | **sim** | `http://localhost:8000` em dev. O compose injeta `http://securo-backend:8000`. |
 | `SECURO_ADMIN_EMAIL` / `SECURO_ADMIN_PASSWORD` | **sim** | Usuário de serviço do Securo, criado automaticamente no primeiro boot. |
 | `SECURO_PROVISION_SECRET` | **sim** | Deriva a senha de cada perfil no Securo. **Não trocar depois de provisionar usuários.** |

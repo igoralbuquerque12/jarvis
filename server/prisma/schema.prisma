@@ -93,6 +93,7 @@ model Profile {
   securoAccount      SecuroAccount?
   apiKeys            ApiKey[]
   healthCheckConfigs HealthCheckConfig[]
+  databaseInformations DatabaseInformation[]
   createdAt          DateTime            @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -245,4 +246,18 @@ model HealthCheckConfig {
 
   @@index([profileId])
   @@map("health_check_configs")
+}
+
+model DatabaseInformation {
+  id          String   @id @default(uuid()) @db.Uuid
+  profileId   String   @db.Uuid
+  name        String
+  description String
+  content     Json
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([profileId])
+  @@map("database_informations")
 }

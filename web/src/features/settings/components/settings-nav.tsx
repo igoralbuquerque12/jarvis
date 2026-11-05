@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const NAV_ITEMS = [
   { to: '/configuracoes/api', label: 'Chaves de API' },
   { to: '/configuracoes/sentinela', label: 'Sentinela' },
+  { to: '/configuracoes/conhecimento', label: 'Conhecimento' },
   { to: '/configuracoes/documentacao', label: 'Documentação' },
 ];
 

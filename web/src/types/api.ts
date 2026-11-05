@@ -264,3 +264,17 @@ export interface UpdateHealthCheckConfigPayload {
   alertMessage?: string;
   active?: boolean;
 }
+
+// ── Database information (knowledge) ─────────────────────────────────────────
+
+export interface DatabaseInformation {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DatabaseInformationPayload {
+  content: string;
+}

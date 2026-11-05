@@ -9,10 +9,12 @@ import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.s
 import { AssistantConnectionService } from './assistant-connection.service';
 import { AssistantToolsService } from './assistant-tools.service';
 import { SubscriptionService } from '../../subscription/services/subscription.service';
+import { DatabaseInformationService } from '../../database-information/services/database-information.service';
 import { buildTemporalContext } from '../utils/build-system-prompt';
 import type { ReceiveMessageWorkflowInput } from '../entities/receive-message-workflow-input';
 
 const HISTORY_SIZE = 10;
+const KNOWLEDGE_TOOL_NAME = 'database_information';
 
 @Injectable()
 export class AssistantMainService {
@@ -26,6 +28,7 @@ export class AssistantMainService {
     private readonly assistantConnectionService: AssistantConnectionService,
     private readonly assistantToolsService: AssistantToolsService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly databaseInformationService: DatabaseInformationService,
   ) {}
 
   async receiveMessage(data: IncomingMessageDto) {
@@ -77,6 +80,9 @@ export class AssistantMainService {
         profile.subscriptionId,
       );
       const { directive, tools } = this.assistantToolsService.forPlan(plan);
+      const knowledge = tools.some((tool) => tool.name === KNOWLEDGE_TOOL_NAME)
+        ? await this.databaseInformationService.findIndexByProfile(profile.id)
+        : [];
 
       const workflowInput: ReceiveMessageWorkflowInput = {
         directive,
@@ -85,6 +91,7 @@ export class AssistantMainService {
         currentMessage,
         lastMessages,
         tools,
+        knowledge,
         ...buildTemporalContext(profile.timezone),
       };
       this.logger.debug(
@@ -93,6 +100,7 @@ export class AssistantMainService {
             ...workflowInput,
             directive: `[${directive.length} chars]`,
             tools: tools.map((tool) => tool.name),
+            knowledge: knowledge.length,
           },
         )}`,
       );

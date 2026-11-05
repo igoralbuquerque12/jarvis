@@ -53,6 +53,27 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
+  it('publishes the knowledge read operation under the database-information path', () => {
+    const tool = ASSISTANT_TOOLS.find(
+      (item) => item.name === 'database_information',
+    );
+
+    expect(tool?.path).toBe(
+      '/knowledge-m2m/:profileId/database-information/execute',
+    );
+    expect(operationNames('database_information')).toEqual([
+      'get_database_information',
+    ]);
+  });
+
+  it('keeps operation names unique across tools', () => {
+    const names = ASSISTANT_TOOLS.flatMap((tool) =>
+      tool.operations.map((operation) => operation.name),
+    );
+
+    expect(new Set(names).size).toBe(names.length);
+  });
+
   it('describes every operation with usage, fields and an example', () => {
     for (const tool of ASSISTANT_TOOLS) {
       expect(tool.description.length).toBeGreaterThan(10);
