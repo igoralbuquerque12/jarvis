@@ -13,6 +13,7 @@ import { EventsModule } from './events/events.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { PublicApiModule } from './public-api/public-api.module';
 import { HealthCheckModule } from './health-check/health-check.module';
+import { DatabaseInformationModule } from './database-information/database-information.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { HealthCheckModule } from './health-check/health-check.module';
     ApiKeysModule,
     PublicApiModule,
     HealthCheckModule,
+    DatabaseInformationModule,
   ],
   controllers: [],
   providers: [],
