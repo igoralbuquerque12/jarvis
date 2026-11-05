@@ -8,11 +8,13 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { AssistantConnectionService } from './services/assistant-connection.service';
 import { AssistantToolsService } from './services/assistant-tools.service';
 import { AssistantToolGuard } from './guards/assistant-tool.guard';
+import { DatabaseInformationModule } from '../database-information/database-information.module';
 
 @Module({
   imports: [
     forwardRef(() => ProfileModule),
     MessagesModule,
+    DatabaseInformationModule,
     forwardRef(() => WhatsappModule),
   ],
   providers: [
