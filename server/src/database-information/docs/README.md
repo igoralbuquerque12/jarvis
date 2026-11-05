@@ -39,23 +39,23 @@ processamento em segundo plano.
 
 ## Consulta pelo assistente (n8n)
 
-1. **Índice no contexto.** A cada mensagem, o payload enviado ao n8n traz
+1. **Índice no contexto.** O contexto da run
+   (`GET /assistant-m2m/runs/:runId/context`) traz
    `knowledge: [{ id, name, description }]` (só id, nome e descrição, ordenadas
-   por criação). Vazio quando o plano do usuário não inclui a ferramenta. O n8n
-   deve renderizá-lo no prompt do sistema como `<bases_de_conhecimento>`,
-   por exemplo com `JSON.stringify($json.knowledge)`.
+   por criação). Vazio quando o plano do usuário não inclui a ferramenta. O nó
+   *Build prompt* do `n8n.json` o renderiza no prompt do sistema como
+   `<bases_de_conhecimento>` (JSON da lista).
 2. **Ferramenta `database_information`.** O modelo escolhe a base pela
-   `description` e chama `get_database_information` com o `id` da lista.
-3. **Endpoint geral de conhecimento.**
-   `POST /knowledge-m2m/:profileId/database-information/execute`
-   com `{ operation: "get_database_information", data: { databaseInformationId } }`.
-   Retorna `{ id, name, description, content }` (texto integral). O prefixo
-   `knowledge-m2m` é geral: cada fonte tem o seu próprio path (a consulta de
-   audit entrará como `.../audit/execute`).
-4. Protegido por `AssistantToolGuard` (`ASSISTANT_WORKFLOW_KEY`), como os demais
-   M2M, e deve ser alcançado só pela rede `jarvis-internal`. Base de outro perfil
-   ou id inexistente responde `not_found`; id malformado, `validation_error`.
-
-No n8n (o `n8n.json` não está versionado neste repositório): adicione ao prompt
-do sistema o bloco `<bases_de_conhecimento>` e um nó de tool que chame o path
-acima, igual aos nós de `events` (`operation` fixa, `data` como JSON em texto).
+   `description` e, pela ferramenta genérica `executar_ferramenta`, chama
+   `POST /assistant-m2m/runs/:runId/tools/execute` com
+   `{ tool: "database_information", operation: "get_database_information", data: { databaseInformationId } }`
+   (`data` também pode vir como JSON em texto). Retorna
+   `{ id, name, description, content }` (texto integral).
+3. **Handler.** `services/database-information-tool.service.ts`
+   (`@AssistantToolHandlerFor('database_information')`). O `profileId` vem da
+   run, nunca do modelo. Uma nova fonte de conhecimento entra como outra
+   ferramenta no catálogo com o seu próprio handler; nada muda no n8n.
+4. Protegido por `AssistantToolGuard` (`ASSISTANT_WORKFLOW_KEY`) e deve ser
+   alcançado só pela rede `jarvis-internal`. Base de outro perfil ou id
+   inexistente responde `not_found`; id ausente ou malformado,
+   `validation_error`.

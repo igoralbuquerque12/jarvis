@@ -23,15 +23,23 @@ resultado do envio.
 - Ao terminar um evento `UNIQUE`, sua série fica inativa. Ao deletar uma série,
   ela fica inativa e todas as execuções pendentes passam para `CANCELLED`.
 
-## Endpoints
+## Ferramenta `events` do assistente
 
-### `POST /events-m2m/events`
+O módulo não tem rota própria para o n8n. O assistente usa a ferramenta
+`events`: o n8n chama `POST /assistant-m2m/runs/:runId/tools/execute` com
+`{ "tool": "events", "operation": "...", "data": "<JSON em texto>" }` (guard
+`AssistantToolGuard`, só na rede interna) e o `EventsToolService`
+(`services/events-tool.service.ts`, marcado com
+`@AssistantToolHandlerFor('events')`) delega para o `EventsM2mService`. O
+`profileId` vem sempre da run, nunca do modelo. Erros saem no formato
+`{ error: { code, message, fields? } }` do `M2mExceptionFilter`.
 
-Cria uma série e a primeira execução `PENDING`.
+### `create_event`
+
+Cria uma série e a primeira execução `PENDING`. `data`:
 
 ```json
 {
-  "profileId": "uuid",
   "type": "RECURRENCE",
   "startAt": "2026-07-25T09:05:00-03:00",
   "content": "Verificar novos pedidos",
@@ -43,35 +51,31 @@ Cria uma série e a primeira execução `PENDING`.
 Para `UNIQUE`, não envie `recurrenceInterval` nem `recurrenceMode`. A resposta
 é `{ "eventSeries": {}, "eventExecution": {} }`.
 
-### `DELETE /events-m2m/events/:eventSeriesId`
+### `find_active_events`
 
-Desativa a série e cancela suas pendências. Retorna a série e
-`cancelledExecutions`.
+Lista apenas execuções `PENDING` ou `PROCESSING` de séries ativas do perfil.
 
-### `GET /events-m2m/events`
-
-Lista apenas execuções `PENDING` ou `PROCESSING` de séries ativas.
-
-- `profileId=uuid` é obrigatório e restringe a consulta ao perfil.
-- `scheduledAt=YYYY-MM-DD` é opcional e filtra o dia calendário no fuso do
+- `scheduledAt` (`YYYY-MM-DD`) é opcional e filtra o dia calendário no fuso do
   perfil.
-- `type=UNIQUE|RECURRENCE` é opcional e pode ser combinado com a data.
+- `type` (`UNIQUE` ou `RECURRENCE`) é opcional e pode ser combinado com a data.
 
-### `GET /events-m2m/guideline`
+### `delete_event`
 
-Retorna uma diretriz textual básica para a IA estruturar requisições de evento.
+`data`: `{ "eventSeriesId": "uuid" }`. Desativa a série e cancela suas
+pendências. Retorna a série e `cancelledExecutions`.
 
 ## Endpoints autenticados (web)
 
-Diferente dos `/events-m2m/*` (protegidos apenas pela rede interna), estes
+Diferente da ferramenta do assistente (alcançável só pela rede interna), estes
 endpoints exigem sessão do better-auth (cookie) e operam sempre sobre o perfil
 do usuário logado — o `profileId` nunca vem do cliente.
 
 O controller tem `@RequiresPlan(PLAN_FEATURE_MIN_PLAN.eventsManagement)`: se o
 plano do usuário for inferior ao mínimo, a resposta é `403
-{ code: 'plan_required', requiredPlan, currentPlan }`. Os `/events-m2m/*` não
-passam pelo guard; para o assistente, a tool `events` (`minPlan` igual) só é
-enviada ao n8n quando o plano do usuário a inclui.
+{ code: 'plan_required', requiredPlan, currentPlan }`. A ferramenta não passa
+pelo `PlanGuard`; a tool `events` (`minPlan` igual) só é enviada ao n8n quando
+o plano do usuário a inclui, e o backend refaz a checagem a cada execução
+(fora do plano → `unsupported_operation`).
 
 ### `GET /events/me`
 
@@ -138,7 +142,7 @@ próxima janela de 2h:
   reserva como `PROCESSING`, envia o conteúdo para o `jid` do perfil,
   persiste `COMPLETED` ou `FAILED` e registra falhas em `observabilitys`.
 
-Ao criar um evento (`POST /events-m2m/events`) cujo `startAt` cai dentro das
+Ao criar um evento (`create_event` ou `POST /events/me`) cujo `startAt` cai dentro das
 próximas 2h, o cache é invalidado (`DEL`) imediatamente, forçando a próxima
 execução da schedule a reconsultar o banco e incluir o novo evento na janela.
 

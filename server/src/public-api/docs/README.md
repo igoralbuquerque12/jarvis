@@ -5,7 +5,7 @@ Todas as rotas vivem sob `/v1`, são protegidas por `ApiKeyGuard` (ver
 `api-keys/docs/README.md`) e agem **sempre em nome do dono da chave** — o
 cliente nunca informa `profileId`, `jid` ou telefone.
 
-Ao contrário dos `/events-m2m/*` e `/finance-m2m/*` (só na rede interna), estas
+Ao contrário dos `/assistant-m2m/*` (chamados pelo n8n, só na rede interna), estas
 rotas são feitas para serem expostas na internet junto com o restante da API.
 
 ## Autenticação
