@@ -31,11 +31,17 @@ export class AiService implements AiProvider, OnModuleInit {
   }
 
   extract<T>(request: AiExtractRequest<T>): Promise<T> {
-    return this.withRetry(() => this.provider.extract(request));
+    return this.withRetry(
+      () => this.provider.extract(request),
+      request.maxAttempts ?? AI_MAX_ATTEMPTS,
+    );
   }
 
   // Every new contract method must go through the same wrapper.
-  private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+  private async withRetry<T>(
+    operation: () => Promise<T>,
+    maxAttempts: number,
+  ): Promise<T> {
     for (let attempt = 1; ; attempt++) {
       try {
         return await operation();
@@ -43,7 +49,7 @@ export class AiService implements AiProvider, OnModuleInit {
         if (
           !(error instanceof AiProviderError) ||
           !error.retryable ||
-          attempt >= AI_MAX_ATTEMPTS
+          attempt >= maxAttempts
         ) {
           throw error;
         }
@@ -53,7 +59,7 @@ export class AiService implements AiProvider, OnModuleInit {
         const delay = Math.max(error.retryAfterMs ?? 0, backoff + jitter);
 
         this.logger.warn(
-          `Attempt ${attempt}/${AI_MAX_ATTEMPTS} failed (${error.message}); retrying in ${Math.round(delay)}ms.`,
+          `Attempt ${attempt}/${maxAttempts} failed (${error.message}); retrying in ${Math.round(delay)}ms.`,
         );
 
         await new Promise((resolve) => setTimeout(resolve, delay));

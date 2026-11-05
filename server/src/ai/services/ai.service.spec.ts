@@ -69,6 +69,20 @@ describe('AiService', () => {
     await expect(promise).resolves.toEqual({ name: 'ok' });
   });
 
+  it('honors a per-call maxAttempts', async () => {
+    const error = new AiProviderError('down', true);
+    const extract = jest.fn().mockRejectedValue(error);
+    const { service } = makeService(extract);
+
+    const assertion = expect(
+      service.extract({ ...request, maxAttempts: 2 }),
+    ).rejects.toBe(error);
+
+    await jest.advanceTimersByTimeAsync(AI_RETRY_BASE_MS);
+    await assertion;
+    expect(extract).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry non-retryable errors', async () => {
     const error = new AiProviderError('unauthorized', false);
     const extract = jest.fn().mockRejectedValue(error);
