@@ -1,0 +1,505 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assistant-development",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1088,
+        368
+      ],
+      "id": "dfe52d7c-40db-46df-b234-2bcdf59fa3f6",
+      "name": "Webhook1",
+      "webhookId": "0f7e5bed-afac-44e7-bd70-a8cd1788994f",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LBtjjpRFbh0oMkNR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// The backend only sends the run id; everything else is read back from\n// /assistant-m2m/runs/:runId/context and /tools.\nconst body = $json.body ?? {};\nconst runId = typeof body.runId === 'string' ? body.runId.trim() : '';\nconst valid =\n  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId);\n\nreturn { json: { valid, runId } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        368
+      ],
+      "id": "90279da2-edbb-42b0-97cb-63d000d64a2e",
+      "name": "Validate input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "25748990-6882-4b1a-a82e-11780c4ede8c",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -672,
+        368
+      ],
+      "id": "43dccf4d-1641-44c0-a0c3-a9c9975f86c3",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ...$json,\n\n    config: {\n      baseUrl: 'https://8w5zfdq6-3000.brs.devtunnels.ms',\n    },\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        288
+      ],
+      "id": "0f3897dc-5f9b-43a1-8db4-237767081ad9",
+      "name": "Config"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'invalid_run_id' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -464,
+        528
+      ],
+      "id": "c4ad8070-d1ea-41c7-8cec-a1d79fd3afef",
+      "name": "Respond invalid"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').item.json.config.baseUrl }}/assistant-m2m/runs/{{ $('Config').item.json.runId }}/context",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        288
+      ],
+      "id": "6a1f0c52-3b8e-4d7a-9c21-0e5b7d4f8a11",
+      "name": "Get context",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LBtjjpRFbh0oMkNR",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').item.json.config.baseUrl }}/assistant-m2m/runs/{{ $('Config').item.json.runId }}/tools",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        288
+      ],
+      "id": "9c3e2a71-5d4f-4b8e-8a12-7f6c1d0e9b22",
+      "name": "Get tools",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LBtjjpRFbh0oMkNR",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'context_unavailable' } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -48,
+        528
+      ],
+      "id": "3e7b9d10-2c6a-4f1e-b8d5-6a0f4c2e1d33",
+      "name": "Respond error"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Runs after \"Get context\" and \"Get tools\".\n//\n// Output:\n//   systemPrompt → AI Agent › Options › System Message  ({{ $json.systemPrompt }})\n//   userPrompt   → AI Agent › Prompt (Define below)      ({{ $json.userPrompt }})\n//   runId        → used by the executar_ferramenta tool  ({{ $('Build prompt').item.json.runId }})\n//\n// The system prompt carries instructions, the tool reference of the user's\n// plan and the context of the day; everything the user or Jarvis said goes\n// to the user prompt as data inside tags.\n\nconst context = $('Get context').item.json;\nconst toolset = $('Get tools').item.json;\nconst runId = $('Config').item.json.runId;\n\n// Angle brackets in user content are neutralised so a message can never\n// close or open one of the context tags below (prompt-injection guard).\nconst escapeTags = (value) =>\n  String(value ?? '').replace(/</g, '‹').replace(/>/g, '›');\n\nconst messages = [...(context.lastMessages ?? [])];\nconst ordered = messages.every((message) => message.createdAt)\n  ? messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))\n  : messages.reverse(); // backend sends newest first\n\nconst history = ordered\n  .map((message) => {\n    const author = message.type === 'AI' ? 'jarvis' : 'usuario';\n    return `<mensagem autor=\"${author}\">${escapeTags(message.content)}</mensagem>`;\n  })\n  .join('\\n');\n\nconst timezone = context.timezone || 'America/Sao_Paulo';\nconst fallbackNow = new Date();\nconst nowIso = context.now || fallbackNow.toISOString();\nconst nowHuman =\n  context.nowHuman ||\n  new Intl.DateTimeFormat('pt-BR', {\n    timeZone: timezone,\n    dateStyle: 'full',\n    timeStyle: 'short',\n  }).format(fallbackNow);\n\nconst profileContext =\n  (context.profileContext || '').trim() ||\n  'Nenhuma informação adicional sobre o usuário.';\n\nconst knowledge = (Array.isArray(context.knowledge) ? context.knowledge : []).map(\n  ({ id, name, description }) => ({ id, name, description }),\n);\n\nconst systemPrompt = [\n  context.directive ?? '',\n  '',\n  toolset.reference ?? '',\n  '',\n  '# Contexto desta conversa',\n  '',\n  '<data_e_hora_atual>',\n  `${nowHuman} (${nowIso}, fuso ${timezone})`,\n  '</data_e_hora_atual>',\n  '',\n  '<perfil_do_usuario>',\n  escapeTags(profileContext),\n  '</perfil_do_usuario>',\n  '',\n  '<bases_de_conhecimento>',\n  escapeTags(JSON.stringify(knowledge)),\n  '</bases_de_conhecimento>',\n].join('\\n');\n\nconst currentMessage = String(context.currentMessage ?? '');\n\nconst userPrompt = [\n  '<historico_recente>',\n  history || 'Nenhuma mensagem anterior.',\n  '</historico_recente>',\n  '',\n  '<mensagem_atual>',\n  escapeTags(currentMessage),\n  '</mensagem_atual>',\n].join('\\n');\n\nreturn {\n  json: {\n    runId,\n    hasMessage: currentMessage.trim().length > 0,\n    systemPrompt,\n    userPrompt,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        288
+      ],
+      "id": "48f3f439-623e-483c-a4ae-deb89a888254",
+      "name": "Build prompt"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1e3a5b7-9d2f-4a6c-8e0b-3f5d7a9c1e55",
+              "leftValue": "={{ $json.hasMessage }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        368,
+        288
+      ],
+      "id": "b4d2e6f8-1a3c-4e5b-9d7f-2c8a0e6b4f44",
+      "name": "Has message"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { response: 'Não foi possível processar a mensagem agora.' } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        576,
+        528
+      ],
+      "id": "d6f8a0c2-4e6b-4d8f-a1c3-5e7b9d1f3a66",
+      "name": "Respond empty"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userPrompt }}",
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}",
+          "maxIterations": 8
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        576,
+        288
+      ],
+      "id": "462c0ff3-023b-4488-88d8-e0a47dc35218",
+      "name": "AI Agent1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        512,
+        512
+      ],
+      "id": "a6927ad0-3c85-4d9b-9590-cde3eaf563dc",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "msKxa1GYRlh3pNr0",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Executa uma operação de qualquer ferramenta listada em \"Ferramentas disponíveis\" nas instruções. Informe tool (nome exato da ferramenta), operation (nome exato da operação dessa ferramenta) e data (campos da operação como objeto JSON serializado em string; \"{}\" quando não houver campos). Retorna o resultado da operação ou { \"error\": { \"code\", \"message\", \"fields\"? } } indicando o que corrigir.",
+        "method": "POST",
+        "url": "={{ $('Config').item.json.config.baseUrl }}/assistant-m2m/runs/{{ $('Build prompt').item.json.runId }}/tools/execute",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  tool: $fromAI(\n    'tool',\n    'Nome exato de uma das ferramentas listadas em \"Ferramentas disponíveis\" nas instruções.',\n    'string'\n  ),\n  operation: $fromAI(\n    'operation',\n    'Nome exato de uma das operações dessa ferramenta, conforme a lista dela nas instruções.',\n    'string'\n  ),\n  data: $fromAI(\n    'data',\n    'Campos da operação como objeto JSON serializado em string. Use \"{}\" quando não houver campos.',\n    'string'\n  )\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        512
+      ],
+      "id": "e8a0c2e4-6b8d-4f0a-b3c5-7d9f1b3e5a77",
+      "name": "executar_ferramenta",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LBtjjpRFbh0oMkNR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rawResponse = $json.output ?? $json.text;\n\nconst response =\n  typeof rawResponse === 'string' && rawResponse.trim()\n    ? rawResponse.trim()\n    : 'Desculpe, tive um problema aqui e não consegui responder agora. Pode repetir?';\n\nreturn {\n  json: {\n    response,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        288
+      ],
+      "id": "757af0f7-caa8-4316-819c-0b009ff7f104",
+      "name": "Format response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { response: $json.response } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1136,
+        288
+      ],
+      "id": "536126d4-f61b-4528-858c-dce259f5e29e",
+      "name": "Respond to Webhook2"
+    }
+  ],
+  "connections": {
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Validate input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate input": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get context": {
+      "main": [
+        [
+          {
+            "node": "Get tools",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get tools": {
+      "main": [
+        [
+          {
+            "node": "Build prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build prompt": {
+      "main": [
+        [
+          {
+            "node": "Has message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has message": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Format response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "executar_ferramenta": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c248efe7a7608fa068422bd0ba2583eaa97eca177152b68b1c295208becabdfc"
+  }
+}
