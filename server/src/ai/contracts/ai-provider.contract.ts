@@ -7,6 +7,10 @@ export type AiExtractRequest<T> = {
   instructions: string;
   /** Expected shape of the result. The output is always validated against it. */
   schema: ZodType<T>;
+  /** Per-attempt timeout. Defaults to AI_TIMEOUT_MS. */
+  timeoutMs?: number;
+  /** Total attempts including the first. Defaults to AI_MAX_ATTEMPTS. */
+  maxAttempts?: number;
 };
 
 /**
