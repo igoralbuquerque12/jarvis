@@ -1,5 +1,11 @@
 import { MessageType } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateMessageDto {
   @IsString()
@@ -12,4 +18,9 @@ export class CreateMessageDto {
 
   @IsEnum(MessageType)
   type: MessageType;
+
+  /** Assistant run that produced (or received) the message. */
+  @IsOptional()
+  @IsUUID()
+  runId?: string;
 }
