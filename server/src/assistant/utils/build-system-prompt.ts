@@ -1,6 +1,5 @@
 import { DateTime } from 'luxon';
 
-import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import type {
   AssistantTool,
   ToolField,
@@ -67,7 +66,7 @@ function renderOperation(operation: ToolOperation): string[] {
   ];
 
   if (operation.fields.length === 0) {
-    lines.push('Campos: nenhum; envie data={}.');
+    lines.push('Campos: nenhum; envie data="{}".');
   } else {
     lines.push('Campos:', ...operation.fields.map(renderField));
   }
@@ -90,12 +89,6 @@ function renderTool(tool: AssistantTool): string {
     `Operações: ${tool.operations.map((operation) => operation.name).join(', ')}.`,
   ];
 
-  if (tool.dataEncoding === 'json-string') {
-    lines.push(
-      'Formato: envie data como um objeto JSON serializado em texto; para uma operação sem campos, envie "{}".',
-    );
-  }
-
   for (const operation of tool.operations) {
     lines.push('', ...renderOperation(operation));
   }
@@ -103,15 +96,17 @@ function renderTool(tool: AssistantTool): string {
   return lines.join('\n');
 }
 
+/** Name of the single generic tool node in n8n (see n8n.json). */
+export const GENERIC_TOOL_NAME = 'executar_ferramenta';
+
+/**
+ * Catalogue of the tools the plan unlocks, as the model reads it. n8n exposes
+ * one generic tool; `tool` + `operation` select what runs in the backend.
+ */
 export function renderToolsReference(tools: AssistantTool[]): string {
   return [
     '# Ferramentas disponíveis',
-    'Toda ferramenta recebe "operation" (nome exato de uma das operações dela) e "data" (os campos da operação, no formato indicado pela própria ferramenta). Omita campos opcionais que não se aplicam. Quando uma operação precisar de um id, obtenha-o antes com a operação de listagem da mesma ferramenta. Nunca use uma operação em uma ferramenta que não a lista.',
+    `Todas as ferramentas abaixo são acionadas pela ferramenta ${GENERIC_TOOL_NAME}, que recebe três campos: "tool" (nome exato de uma das ferramentas desta lista), "operation" (nome exato de uma das operações dessa ferramenta) e "data" (os campos da operação como um objeto JSON serializado em texto; para uma operação sem campos, envie "{}"). Omita campos opcionais que não se aplicam. Quando uma operação precisar de um id, obtenha-o antes com a operação de listagem da mesma ferramenta. Nunca use uma operação em uma ferramenta que não a lista.`,
     ...tools.map(renderTool),
   ].join('\n\n');
-}
-
-/** Static instructions + tool reference. Dynamic context is appended by n8n. */
-export function buildDirective(tools: AssistantTool[]): string {
-  return `${DEFAULT_DIRECTIVE}\n\n${renderToolsReference(tools)}`;
 }

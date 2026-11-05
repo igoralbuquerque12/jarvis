@@ -6,9 +6,10 @@
  * success criteria, formatting, and a few examples that demonstrate
  * decisions (not phrases to copy). Every rule appears exactly once.
  *
- * The tool reference is appended at runtime by `buildDirective`; n8n adds
- * the dynamic context (date, profile) to the system prompt and puts the
- * recent history + current message in the user prompt.
+ * n8n reads this text from `GET /assistant-m2m/runs/:runId/context`, the tool
+ * reference from `GET /assistant-m2m/runs/:runId/tools`, and joins them with
+ * the dynamic context (date, profile, knowledge bases) in the system prompt;
+ * the recent history + current message go in the user prompt.
  */
 export const DEFAULT_DIRECTIVE = `
 # Papel e objetivo

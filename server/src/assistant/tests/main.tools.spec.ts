@@ -7,9 +7,6 @@ const operationNames = (name: string) =>
 
 describe('ASSISTANT_TOOLS', () => {
   it('publishes every events operation in the events tool', () => {
-    const eventsTool = ASSISTANT_TOOLS.find((tool) => tool.name === 'events');
-
-    expect(eventsTool?.path).toBe('/events-m2m/:profileId/execute');
     expect(operationNames('events')).toEqual([
       'create_event',
       'find_active_events',
@@ -17,10 +14,7 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
-  it('publishes every finance operation in the finance RPC tool', () => {
-    const financeTool = ASSISTANT_TOOLS.find((tool) => tool.name === 'finance');
-
-    expect(financeTool?.path).toBe('/finance-m2m/:profileId/execute');
+  it('publishes every finance operation in the finance tool', () => {
     expect(operationNames('finance')).toEqual([
       'list_accounts',
       'create_account',
@@ -53,17 +47,16 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
-  it('publishes the knowledge read operation under the database-information path', () => {
-    const tool = ASSISTANT_TOOLS.find(
-      (item) => item.name === 'database_information',
-    );
-
-    expect(tool?.path).toBe(
-      '/knowledge-m2m/:profileId/database-information/execute',
-    );
+  it('publishes the knowledge read operation in the database_information tool', () => {
     expect(operationNames('database_information')).toEqual([
       'get_database_information',
     ]);
+  });
+
+  it('keeps tool names unique (each one maps to exactly one handler)', () => {
+    const names = ASSISTANT_TOOLS.map((tool) => tool.name);
+
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it('keeps operation names unique across tools', () => {
