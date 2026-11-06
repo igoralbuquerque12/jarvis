@@ -194,6 +194,22 @@ export class EventExecutionService {
   }
 
   /**
+   * Resolves the pending execution of an active series owned by `profileId`,
+   * matching either `eventSeries.id` or `eventExecution.id`.
+   */
+  findPendingBySeriesOrExecutionId(profileId: string, id: string) {
+    return this.prisma.eventExecution.findFirst({
+      where: {
+        status: EventExecutionStatus.PENDING,
+        eventSeries: { profileId, active: true },
+        OR: [{ eventSeriesId: id }, { id }],
+      },
+      include: { eventSeries: true },
+      orderBy: { scheduledAt: 'asc' },
+    });
+  }
+
+  /**
    * Updates an execution only while it is still `PENDING`, so an edit can never
    * race with the scheduler claiming it. `count === 0` means it was claimed.
    */
