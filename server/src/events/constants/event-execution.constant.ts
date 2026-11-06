@@ -2,6 +2,17 @@ import { EventExecutionStatus } from '@prisma/client';
 
 export const EVENT_LIST_TABS = ['upcoming', 'past'] as const;
 
+export const ACTIVE_EVENT_FILTERS = [
+  'ALL',
+  'RECURRING',
+  'TODAY',
+  'NEXT_3_DAYS',
+  'NEXT_7_DAYS',
+  'NEXT_30_DAYS',
+] as const;
+
+export type ActiveEventFilter = (typeof ACTIVE_EVENT_FILTERS)[number];
+
 /** Executions still waiting to fire (or firing right now). */
 export const UPCOMING_EVENT_STATUSES: EventExecutionStatus[] = [
   EventExecutionStatus.PENDING,
