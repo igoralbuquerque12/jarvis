@@ -2,8 +2,10 @@ import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseInformationService } from '../../database-information/services/database-information.service';
-import { EventsM2mService } from '../../events/services/events-m2m.service';
+import { getEventsAssistantCacheKey } from '../../events/constants/events-cache.constant';
+import type { CachedAssistantEvent } from '../../events/types/event-execution.types';
 import { MessagesService } from '../../messages/services/messages.service';
+import { RedisService } from '../../redis/services/redis.service';
 import { DEFAULT_DIRECTIVE } from '../config/guideline.config';
 import type {
   AssistantRunContext,
@@ -25,7 +27,7 @@ export class AssistantContextService {
     private readonly assistantToolsService: AssistantToolsService,
     private readonly messagesService: MessagesService,
     private readonly databaseInformationService: DatabaseInformationService,
-    private readonly eventsM2mService: EventsM2mService,
+    private readonly redisService: RedisService,
   ) {}
 
   async getContext(runId: string): Promise<AssistantRunContext> {
@@ -44,7 +46,7 @@ export class AssistantContextService {
       ? await this.databaseInformationService.findIndexByProfile(profile.id)
       : [];
     const cachedEvents = tools.some((tool) => tool.name === EVENTS_TOOL_NAME)
-      ? await this.eventsM2mService.getCachedEvents(profile.id)
+      ? await this.getCachedEvents(profile.id)
       : [];
 
     const profileName = profile.name.trim();
@@ -81,5 +83,26 @@ export class AssistantContextService {
     const { profile } = await this.assistantRunService.findActive(runId);
 
     return this.assistantToolsService.forProfile(profile);
+  }
+
+  private async getCachedEvents(
+    profileId: string,
+  ): Promise<CachedAssistantEvent[]> {
+    const client = this.redisService.getClient();
+    if (typeof client?.get !== 'function') {
+      return [];
+    }
+
+    const raw = await client.get(getEventsAssistantCacheKey(profileId));
+    if (!raw) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as CachedAssistantEvent[]) : [];
+    } catch {
+      return [];
+    }
   }
 }
