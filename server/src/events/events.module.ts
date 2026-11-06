@@ -14,7 +14,7 @@ import { EventsToolService } from './services/events-tool.service';
   imports: [
     forwardRef(() => AuthModule),
     forwardRef(() => ProfileModule),
-    WhatsappModule,
+    forwardRef(() => WhatsappModule),
   ],
   controllers: [EventsController],
   providers: [
@@ -25,6 +25,6 @@ import { EventsToolService } from './services/events-tool.service';
     EventsToolService,
     EventsSchedule,
   ],
-  exports: [EventSeriesService, EventExecutionService, EventsM2mService],
+  exports: [EventSeriesService, EventExecutionService],
 })
 export class EventsModule {}
