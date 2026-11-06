@@ -9,6 +9,7 @@ import { requireUuid } from '../../core/utils/require-uuid.util';
 import { validateDto } from '../../core/utils/validate-dto.util';
 import { CreateEventDto } from '../dto/create-event.dto';
 import { FindActiveEventsDto } from '../dto/find-active-events.dto';
+import { UpdateEventDto } from '../dto/update-event.dto';
 import { EventsM2mService } from './events-m2m.service';
 
 /** Handler of the `events` assistant tool. */
@@ -33,6 +34,10 @@ export class EventsToolService implements AssistantToolHandler {
           profileId,
         });
         return this.eventsM2mService.findActiveEvents(dto);
+      }
+      case 'update_event': {
+        const dto = await validateDto(UpdateEventDto, { ...data, profileId });
+        return this.eventsM2mService.updateEvent(dto);
       }
       case 'delete_event':
         return this.eventsM2mService.deleteEvent(
