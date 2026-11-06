@@ -8,7 +8,10 @@ import { EventSeriesType, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { RedisService } from '../../redis/services/redis.service';
 import { DEFAULT_EVENTS_PAGE_SIZE } from '../constants/event-execution.constant';
-import { EVENTS_SCHEDULE_CACHE_KEY } from '../constants/events-cache.constant';
+import {
+  EVENTS_SCHEDULE_CACHE_KEY,
+  getEventsAssistantCacheKey,
+} from '../constants/events-cache.constant';
 import { CreateMyEventDto } from '../dto/create-my-event.dto';
 import { ListMyEventsDto } from '../dto/list-my-events.dto';
 import { UpdateMyEventDto } from '../dto/update-my-event.dto';
@@ -136,6 +139,9 @@ export class EventsMeService {
 
     // The scheduler caches { id, scheduledAt } of what is about to fire.
     await this.redisService.getClient().del(EVENTS_SCHEDULE_CACHE_KEY);
+    await this.redisService
+      .getClient()
+      .del(getEventsAssistantCacheKey(profile.id));
 
     const refreshed = await this.eventExecutionService.findOwnedWithSeries(
       profile.id,
