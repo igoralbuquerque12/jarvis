@@ -25,6 +25,6 @@ import { EventsToolService } from './services/events-tool.service';
     EventsToolService,
     EventsSchedule,
   ],
-  exports: [EventSeriesService, EventExecutionService],
+  exports: [EventSeriesService, EventExecutionService, EventsM2mService],
 })
 export class EventsModule {}

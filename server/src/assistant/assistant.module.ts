@@ -10,6 +10,7 @@ import { AssistantConnectionService } from './services/assistant-connection.serv
 import { AssistantToolsService } from './services/assistant-tools.service';
 import { AssistantToolGuard } from './guards/assistant-tool.guard';
 import { DatabaseInformationModule } from '../database-information/database-information.module';
+import { EventsModule } from '../events/events.module';
 import { AssistantM2mController } from './controllers/assistant-m2m.controller';
 import { AssistantRunService } from './services/assistant-run.service';
 import { AssistantContextService } from './services/assistant-context.service';
@@ -22,6 +23,7 @@ import { AssistantToolDispatcherService } from './services/assistant-tool-dispat
     forwardRef(() => ProfileModule),
     MessagesModule,
     DatabaseInformationModule,
+    forwardRef(() => EventsModule),
     forwardRef(() => WhatsappModule),
   ],
   controllers: [AssistantM2mController],
