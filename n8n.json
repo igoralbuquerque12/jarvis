@@ -170,7 +170,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Runs after \"Get context\" and \"Get tools\".\n//\n// Output:\n//   systemPrompt → AI Agent › Options › System Message  ({{ $json.systemPrompt }})\n//   userPrompt   → AI Agent › Prompt (Define below)      ({{ $json.userPrompt }})\n//   runId        → used by the executar_ferramenta tool  ({{ $('Build prompt').item.json.runId }})\n//\n// The system prompt carries instructions, the tool reference of the user's\n// plan and the context of the day; everything the user or Jarvis said goes\n// to the user prompt as data inside tags.\n\nconst context = $('Get context').item.json;\nconst toolset = $('Get tools').item.json;\nconst runId = $('Config').item.json.runId;\n\n// Angle brackets in user content are neutralised so a message can never\n// close or open one of the context tags below (prompt-injection guard).\nconst escapeTags = (value) =>\n  String(value ?? '').replace(/</g, '‹').replace(/>/g, '›');\n\nconst messages = [...(context.lastMessages ?? [])];\nconst ordered = messages.every((message) => message.createdAt)\n  ? messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))\n  : messages.reverse(); // backend sends newest first\n\nconst history = ordered\n  .map((message) => {\n    const author = message.type === 'AI' ? 'jarvis' : 'usuario';\n    return `<mensagem autor=\"${author}\">${escapeTags(message.content)}</mensagem>`;\n  })\n  .join('\\n');\n\nconst timezone = context.timezone || 'America/Sao_Paulo';\nconst fallbackNow = new Date();\nconst nowIso = context.now || fallbackNow.toISOString();\nconst nowHuman =\n  context.nowHuman ||\n  new Intl.DateTimeFormat('pt-BR', {\n    timeZone: timezone,\n    dateStyle: 'full',\n    timeStyle: 'short',\n  }).format(fallbackNow);\n\nconst profileContext =\n  (context.profileContext || '').trim() ||\n  'Nenhuma informação adicional sobre o usuário.';\n\nconst knowledge = (Array.isArray(context.knowledge) ? context.knowledge : []).map(\n  ({ id, name, description }) => ({ id, name, description }),\n);\n\nconst systemPrompt = [\n  context.directive ?? '',\n  '',\n  toolset.reference ?? '',\n  '',\n  '# Contexto desta conversa',\n  '',\n  '<data_e_hora_atual>',\n  `${nowHuman} (${nowIso}, fuso ${timezone})`,\n  '</data_e_hora_atual>',\n  '',\n  '<perfil_do_usuario>',\n  escapeTags(profileContext),\n  '</perfil_do_usuario>',\n  '',\n  '<bases_de_conhecimento>',\n  escapeTags(JSON.stringify(knowledge)),\n  '</bases_de_conhecimento>',\n].join('\\n');\n\nconst currentMessage = String(context.currentMessage ?? '');\n\nconst userPrompt = [\n  '<historico_recente>',\n  history || 'Nenhuma mensagem anterior.',\n  '</historico_recente>',\n  '',\n  '<mensagem_atual>',\n  escapeTags(currentMessage),\n  '</mensagem_atual>',\n].join('\\n');\n\nreturn {\n  json: {\n    runId,\n    hasMessage: currentMessage.trim().length > 0,\n    systemPrompt,\n    userPrompt,\n  },\n};"
+        "jsCode": "// Runs after \"Get context\" and \"Get tools\".\n//\n// Output:\n//   systemPrompt → AI Agent › Options › System Message  ({{ $json.systemPrompt }})\n//   userPrompt   → AI Agent › Prompt (Define below)      ({{ $json.userPrompt }})\n//   runId        → used by the executar_ferramenta tool  ({{ $('Build prompt').item.json.runId }})\n//   sessionKey   → used by the Simple Memory node        ({{ $('Build prompt').item.json.sessionKey }})\n//\n// The system prompt carries instructions, the tool reference of the user's\n// plan and the context of the day; everything the user or Jarvis said goes\n// to the prompt as data inside tags.\n\nconst context = $('Get context').item.json;\nconst toolset = $('Get tools').item.json;\nconst runId = $('Config').item.json.runId;\n\n// Angle brackets in user content are neutralised so a message can never\n// close or open one of the context tags below (prompt-injection guard).\nconst escapeTags = (value) =>\n  String(value ?? '').replace(/</g, '‹').replace(/>/g, '›');\n\nconst messages = [...(context.lastMessages ?? [])];\nconst ordered = messages.every((message) => message.createdAt)\n  ? messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))\n  : messages.reverse(); // backend sends newest first\n\nconst history = ordered\n  .filter(\n    (message) =>\n      !(message.type === 'AI' && /plano atual não inclui|não disponho de busca na web/i.test(String(message.content ?? ''))),\n  )\n  .map((message) => {\n    const author = message.type === 'AI' ? 'jarvis' : 'usuario';\n    return `<mensagem autor=\"${author}\">${escapeTags(message.content)}</mensagem>`;\n  })\n  .join('\\n');\n\nconst timezone = context.timezone || 'America/Sao_Paulo';\nconst fallbackNow = new Date();\nconst nowIso = context.now || fallbackNow.toISOString();\nconst nowHuman =\n  context.nowHuman ||\n  new Intl.DateTimeFormat('pt-BR', {\n    timeZone: timezone,\n    dateStyle: 'full',\n    timeStyle: 'short',\n  }).format(fallbackNow);\n\nconst rawProfileContext = (context.profileContext || '').trim();\nconst profileName = (context.profileName || '').trim();\nconst profileContext =\n  [\n    profileName && !/^Nome:/im.test(rawProfileContext)\n      ? `Nome: ${profileName}`\n      : '',\n    rawProfileContext,\n  ]\n    .filter(Boolean)\n    .join('\\n') || 'Nenhuma informação adicional sobre o usuário.';\n\nconst sessionKey =\n  typeof context.sessionKey === 'string' && context.sessionKey.trim()\n    ? context.sessionKey.trim()\n    : runId;\n\nconst knowledge = (Array.isArray(context.knowledge) ? context.knowledge : []).map(\n  ({ id, name, description }) => ({ id, name, description }),\n);\n\nconst cachedEvents = Array.isArray(context.cachedEvents)\n  ? context.cachedEvents\n  : [];\n\nconst rawDirective = String(context.directive ?? '')\n  .replace(\n    /- As ferramentas listadas são as que o plano do usuário inclui\\.[^\\n]*/g,\n    '- Apenas quando o usuário pedir uma funcionalidade interna do Jarvis (lembretes, finanças ou base de conhecimento) ausente em \"Ferramentas disponíveis\", informe que faz parte de outro plano. Para buscas na web (clima, notícias, fatos atuais, eleições, cotações) ou dúvidas gerais, NUNCA diga que o plano não inclui: use a ferramenta browser_search.',\n  );\n\nconst browserSearchReference = [\n  '## Ferramenta direta \"browser_search\" (incluída em todos os planos): Busca na web em tempo real',\n  'Quando usar: Sempre que o usuário pedir informações atuais, clima, notícias, eleições, cotações, fatos recentes ou pedir para pesquisar na web.',\n  'Como chamar: Acione diretamente a tool `browser_search` passando o parâmetro `query` (NÃO use `executar_ferramenta` para ela).',\n  'Importante: Você TEM acesso à busca na web em todos os planos. Ignore qualquer mensagem antiga em <historico_recente> onde tenha dito que não possui busca na web ou que o plano atual não inclui isso.',\n].join('\\n');\n\nconst systemPrompt = [\n  rawDirective,\n  '',\n  toolset.reference ?? '',\n  '',\n  browserSearchReference,\n  '',\n  '# Contexto desta conversa',\n  '',\n  '<data_e_hora_atual>',\n  `${nowHuman} (${nowIso}, fuso ${timezone})`,\n  '</data_e_hora_atual>',\n  '',\n  '<perfil_do_usuario>',\n  escapeTags(profileContext),\n  '</perfil_do_usuario>',\n  '',\n  '<eventos_em_cache>',\n  escapeTags(JSON.stringify(cachedEvents)),\n  '</eventos_em_cache>',\n  '',\n  '<bases_de_conhecimento>',\n  escapeTags(JSON.stringify(knowledge)),\n  '</bases_de_conhecimento>',\n  '',\n  '<historico_recente>',\n  history || 'Nenhuma mensagem anterior.',\n  '</historico_recente>',\n].join('\\n');\n\nconst currentMessage = String(context.currentMessage ?? '');\n\nconst userPrompt = [\n  '<mensagem_atual>',\n  escapeTags(currentMessage),\n  '</mensagem_atual>',\n].join('\\n');\n\nreturn {\n  json: {\n    runId,\n    sessionKey,\n    hasMessage: currentMessage.trim().length > 0,\n    systemPrompt,\n    userPrompt,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -274,6 +274,21 @@
     },
     {
       "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Build prompt').item.json.sessionKey }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        608,
+        512
+      ],
+      "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d00",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
         "toolDescription": "Executa uma operação de qualquer ferramenta listada em \"Ferramentas disponíveis\" nas instruções. Informe tool (nome exato da ferramenta), operation (nome exato da operação dessa ferramenta) e data (campos da operação como objeto JSON serializado em string; \"{}\" quando não houver campos). Retorna o resultado da operação ou { \"error\": { \"code\", \"message\", \"fields\"? } } indicando o que corrigir.",
         "method": "POST",
         "url": "={{ $('Config').item.json.config.baseUrl }}/assistant-m2m/runs/{{ $('Build prompt').item.json.runId }}/tools/execute",
@@ -302,6 +317,39 @@
         "httpHeaderAuth": {
           "id": "LBtjjpRFbh0oMkNR",
           "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Busca informações atualizadas na web em tempo real usando o browser_search nativo da Groq (clima, notícias, cotações, fatos atuais, endereços, eventos recentes ou qualquer dado que precise de consulta na internet).",
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "groqApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'openai/gpt-oss-120b',\n  temperature: 0.2,\n  tool_choice: 'required',\n  tools: [{ type: 'browser_search' }],\n  messages: [\n    {\n      role: 'system',\n      content: 'Busque na web e responda de forma objetiva, precisa e em português do Brasil com os dados encontrados.'\n    },\n    {\n      role: 'user',\n      content: $fromAI(\n        'query',\n        'Pergunta ou termos claros de busca na web (inclua local e data/ano quando relevante, ex.: clima em São Paulo hoje).',\n        'string'\n      )\n    }\n  ]\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        512
+      ],
+      "id": "f1b2c3d4-8e9f-4a0b-9c1d-2e3f4a5b6c88",
+      "name": "browser_search",
+      "credentials": {
+        "groqApi": {
+          "id": "msKxa1GYRlh3pNr0",
+          "name": "Groq account"
         }
       }
     },
@@ -485,7 +533,29 @@
         ]
       ]
     },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "executar_ferramenta": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "browser_search": {
       "ai_tool": [
         [
           {

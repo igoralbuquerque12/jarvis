@@ -36,33 +36,43 @@ O módulo não tem rota própria para o n8n. O assistente usa a ferramenta
 
 ### `create_event`
 
-Cria uma série e a primeira execução `PENDING`. `data`:
+Cria uma série e a primeira execução `PENDING`. O campo `content` deve ser formatado pelo assistente de forma amigável antes de salvar (ex.: `"Oi, Igor. Você me pediu para te lembrar de lavar o carro."`). `data`:
 
 ```json
 {
   "type": "RECURRENCE",
   "startAt": "2026-07-25T09:05:00-03:00",
-  "content": "Verificar novos pedidos",
+  "content": "Oi, Igor. Você me pediu para te lembrar de verificar novos pedidos.",
   "recurrenceInterval": 1,
   "recurrenceMode": "HOUR"
 }
 ```
 
 Para `UNIQUE`, não envie `recurrenceInterval` nem `recurrenceMode`. A resposta
-é `{ "eventSeries": {}, "eventExecution": {} }`.
+é `{ "eventSeries": {}, "eventExecution": {}, "scheduledAtLocal": "..." }`.
 
 ### `find_active_events`
 
-Lista apenas execuções `PENDING` ou `PROCESSING` de séries ativas do perfil.
+Lista apenas execuções `PENDING` ou `PROCESSING` de séries ativas do perfil e salva os itens retornados no cache do assistente (`events:assistant:cache:<profileId>`, TTL de 30 min, exposto em `<eventos_em_cache>` no contexto da run) para que comandos em sequência como `"busque os eventos de hoje"` e `"deleta ele"` ou `"altera ele"` funcionem imediatamente.
 
-- `scheduledAt` (`YYYY-MM-DD`) é opcional e filtra o dia calendário no fuso do
-  perfil.
+- `filter` é opcional e aceita uma das opções predefinidas:
+  - `RECURRING` — todos os eventos recorrentes ativos
+  - `TODAY` — eventos de hoje (no fuso do perfil)
+  - `NEXT_3_DAYS` — eventos dos próximos 3 dias
+  - `NEXT_7_DAYS` — eventos dos próximos 7 dias
+  - `NEXT_30_DAYS` — eventos dos próximos 30 dias
+  - `ALL` — todos os eventos ativos
+- `scheduledAt` (`YYYY-MM-DD`) é opcional e filtra um dia calendário específico no fuso do perfil.
 - `type` (`UNIQUE` ou `RECURRENCE`) é opcional e pode ser combinado com a data.
+
+### `update_event`
+
+Altera uma execução pendente (e sua série) a partir de `eventSeriesId` (ou `executionId`), permitindo atualizar `startAt`, `content`, `type`, `recurrenceInterval` e `recurrenceMode`. Atualiza o cache do assistente e invalida o cache do scheduler.
 
 ### `delete_event`
 
-`data`: `{ "eventSeriesId": "uuid" }`. Desativa a série e cancela suas
-pendências. Retorna a série e `cancelledExecutions`.
+`data`: `{ "eventSeriesId": "uuid" }`. Desativa a série, cancela suas
+pendências e remove o item do cache do assistente. Retorna a série e `cancelledExecutions`.
 
 ## Endpoints autenticados (web)
 

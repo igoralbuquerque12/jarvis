@@ -7,6 +7,7 @@ import {
   EVENTS_SCHEDULE_CACHE_KEY,
   EVENTS_SCHEDULE_CACHE_TTL_SECONDS,
   EVENTS_SCHEDULE_CACHE_WINDOW_MS,
+  getEventsAssistantCacheKey,
 } from '../constants/events-cache.constant';
 import { EventExecutionService } from '../services/event-execution.service';
 import { EventSeriesService } from '../services/event-series.service';
@@ -109,6 +110,14 @@ export class EventsSchedule {
         status: EventExecutionStatus.FAILED,
         observabilitys,
       });
+    }
+
+    const profileId =
+      execution.eventSeries.profileId ?? execution.eventSeries.profile?.id;
+    if (profileId) {
+      await this.redisService
+        .getClient()
+        .del(getEventsAssistantCacheKey(profileId));
     }
 
     await this.createNextExecution(execution);

@@ -10,6 +10,7 @@ describe('ASSISTANT_TOOLS', () => {
     expect(operationNames('events')).toEqual([
       'create_event',
       'find_active_events',
+      'update_event',
       'delete_event',
     ]);
   });

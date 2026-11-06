@@ -1,4 +1,8 @@
-import type { EventExecutionStatus, EventSeriesType } from '@prisma/client';
+import type {
+  EventExecutionStatus,
+  EventSeriesType,
+  RecurrenceMode,
+} from '@prisma/client';
 import type { EVENT_LIST_TABS } from '../constants/event-execution.constant';
 
 export type EventListTab = (typeof EVENT_LIST_TABS)[number];
@@ -8,6 +12,16 @@ export type ActiveExecutionFilters = {
   type?: EventSeriesType;
   scheduledAtStart?: Date;
   scheduledAtEnd?: Date;
+};
+
+export type CachedAssistantEvent = {
+  id: string;
+  eventSeriesId: string;
+  content: string;
+  scheduledAtLocal: string;
+  type: EventSeriesType;
+  recurrenceInterval: number | null;
+  recurrenceMode: RecurrenceMode | null;
 };
 
 export type EventPageFilters = {
