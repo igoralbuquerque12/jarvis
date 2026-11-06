@@ -3,6 +3,7 @@ import {
   EventSeriesType,
   RecurrenceMode,
 } from '@prisma/client';
+import { EVENTS_SCHEDULE_CACHE_TTL_SECONDS } from '../constants/events-cache.constant';
 import { EventsSchedule } from '../schedules/events.schedule';
 
 describe('EventsSchedule', () => {
@@ -143,7 +144,7 @@ describe('EventsSchedule', () => {
     expect(redisClient.set).toHaveBeenCalledWith(
       'events:schedule:pending-cache',
       expect.any(String),
-      { expiration: { type: 'EX', value: 7200 } },
+      { expiration: { type: 'EX', value: EVENTS_SCHEDULE_CACHE_TTL_SECONDS } },
     );
   });
 });
