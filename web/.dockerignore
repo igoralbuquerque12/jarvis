@@ -4,3 +4,6 @@ dist-ssr
 .git
 .gitignore
 *.log
+.env
+.env.*
+!.env.example
