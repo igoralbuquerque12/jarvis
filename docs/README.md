@@ -379,6 +379,7 @@ node docs/diagrams/render.mjs            # re-renderiza os diagramas desta docum
 | `VITE_WHATSAPP_NUMBER` | Repassado como build arg para o frontend. |
 | `NODE_ENV` | Padrão `development`; use `production` na VPS. |
 | `SECURO_SECRET_KEY` | Segredo do JWT do Securo. Tem um default apenas para dev. |
+| `JARVIS_IMAGE_NAMESPACE` / `JARVIS_VERSION` | Usuário do Docker Hub e tag das imagens de `migrate`/`server`/`web`. Escritos pelo deploy do CI na VPS; localmente ficam vazios (imagens `jarvis/*:local`). |
 
 ---
 
@@ -396,7 +397,7 @@ docker network connect jarvis-internal n8n                # uma única vez
 docker compose logs -f server
 ```
 
-Atualizar é `git pull && docker compose up -d --build`. **Nunca** rode `docker compose down -v` em produção: o volume do Postgres do Securo seria apagado. O passo a passo completo, incluindo como configurar o n8n por túnel SSH sem expor porta, está em [`DEPLOYMENT.md`](../DEPLOYMENT.md).
+Depois da primeira subida, as atualizações são automáticas: cada push na `main` roda o GitHub Actions (`.github/workflows/deploy.yml`), que testa, gera as imagens `jarvis-server`, `jarvis-migrate` e `jarvis-web` com a tag `<VERSION>-<hash curto>` (ex. `1.4.2-a3f9c1b`), envia ao Docker Hub e, via SSH, baixa as imagens na VPS, aplica as migrations e recria só `server` e `web`. O Traefik continua na frente como proxy reverso (HTTPS e roteamento por domínio). **Nunca** rode `docker compose down -v` em produção: o volume do Postgres do Securo seria apagado. O passo a passo completo, incluindo os secrets do GitHub, rollback e como configurar o n8n por túnel SSH sem expor porta, está em [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ---
 

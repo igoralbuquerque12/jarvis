@@ -8,6 +8,7 @@ x-securo-env: &securo-env
 
 services:
   migrate:
+    image: ${JARVIS_IMAGE_NAMESPACE:-jarvis}/jarvis-migrate:${JARVIS_VERSION:-local}
     build:
       context: ./server
       target: builder
@@ -20,6 +21,7 @@ services:
 
   server:
     container_name: jarvis-server
+    image: ${JARVIS_IMAGE_NAMESPACE:-jarvis}/jarvis-server:${JARVIS_VERSION:-local}
     build:
       context: ./server
       target: production
@@ -54,6 +56,7 @@ services:
 
   web:
     container_name: jarvis-web
+    image: ${JARVIS_IMAGE_NAMESPACE:-jarvis}/jarvis-web:${JARVIS_VERSION:-local}
     build:
       context: ./web
       target: production

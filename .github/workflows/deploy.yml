@@ -1,28 +1,192 @@
-name: Deploy Production
+name: CI/CD
+
+# Every push to main: test -> build + push images to Docker Hub -> deploy over SSH.
+# Images are tagged <VERSION>-<short sha> (e.g. 1.4.2-a3f9c1b); there is no `latest`.
+# The deploy only replaces the app containers (migrate, server, web); Redis,
+# Securo and Traefik keep running untouched.
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME }}
+  IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
 jobs:
-  deploy:
+  test:
+    name: Test (server)
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: server
     steps:
-      - name: Jarvis Deploy
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm test
+
+  build:
+    name: Build & push images
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required configuration
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+        run: |
+          missing=0
+          [ -n "$IMAGE_NAMESPACE" ] || { echo "::error::Repository variable DOCKERHUB_USERNAME is not set"; missing=1; }
+          [ -n "$DOCKERHUB_TOKEN" ] || { echo "::error::Repository secret DOCKERHUB_TOKEN is not set"; missing=1; }
+          [ -n "$API_DOMAIN" ] || { echo "::error::Repository variable API_DOMAIN is not set (baked into the web build)"; missing=1; }
+          exit $missing
+
+      - name: Compute image tag
+        id: meta
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=VERSION::VERSION must be MAJOR.MINOR.PATCH, got '$version'"
+            exit 1
+          fi
+          tag="${version}-${GITHUB_SHA::7}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Image tag: \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push server
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          target: production
+          push: true
+          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-server:${{ steps.meta.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      # Same Dockerfile, `builder` stage (has the Prisma CLI); reuses the server cache.
+      - name: Build & push migrate
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          target: builder
+          push: true
+          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-migrate:${{ steps.meta.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          cache-from: type=gha,scope=server
+
+      - name: Build & push web
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          target: production
+          push: true
+          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-web:${{ steps.meta.outputs.tag }}
+          build-args: |
+            VITE_API_URL=https://${{ vars.API_DOMAIN }}
+            VITE_WHATSAPP_NUMBER=${{ vars.VITE_WHATSAPP_NUMBER }}
+          labels: |
+            org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull new images and restart the app containers
         uses: appleboy/ssh-action@v1
+        env:
+          JARVIS_VERSION: ${{ needs.build.outputs.tag }}
+          JARVIS_IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME }}
+          JARVIS_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: JARVIS_VERSION,JARVIS_IMAGE_NAMESPACE,JARVIS_IMAGE_SOURCE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
           script: |
-            set -e
+            set -eu
 
             cd /home/ubuntu/projects/jarvis
 
-            git pull origin main
+            # compose.yml and the vendored Securo sources still come from Git.
+            git pull --ff-only origin main
 
-            docker compose up -d --build
+            touch .env
+            previous="$(sed -n 's/^JARVIS_VERSION=//p' .env | tail -n 1)"
+            echo "Deploying $JARVIS_VERSION (previous: ${previous:-none})"
 
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker compose pull migrate server web
+            docker logout
+
+            # Migrations first; a failure stops the deploy with the old containers still up.
+            docker compose run --rm -T migrate
+
+            # Recreate only the app containers; dependencies are left as they are.
+            docker compose up -d --no-deps --no-build server web
+
+            sleep 20
+            status="$(docker inspect -f '{{.State.Status}}' jarvis-server)"
+            restarts="$(docker inspect -f '{{.RestartCount}}' jarvis-server)"
+            if [ "$status" != "running" ] || [ "$restarts" -gt 0 ]; then
+              echo "jarvis-server is unhealthy (status=$status, restarts=$restarts)"
+              docker compose logs --tail 100 server
+              if [ -n "$previous" ]; then
+                echo "Rolling back to $previous"
+                JARVIS_VERSION="$previous" docker compose up -d --no-deps --no-build server web
+              fi
+              exit 1
+            fi
+
+            # Record the running version so manual `docker compose` commands use it.
+            sed -i '/^JARVIS_VERSION=/d; /^JARVIS_IMAGE_NAMESPACE=/d' .env
+            if [ -s .env ] && [ -n "$(tail -c 1 .env)" ]; then echo >> .env; fi
+            printf 'JARVIS_IMAGE_NAMESPACE=%s\nJARVIS_VERSION=%s\n' "$JARVIS_IMAGE_NAMESPACE" "$JARVIS_VERSION" >> .env
+
+            # Drop unused Jarvis images older than 14 days (recent ones stay for rollback).
+            docker image prune -af --filter "label=org.opencontainers.image.source=$JARVIS_IMAGE_SOURCE" --filter "until=336h"
             docker image prune -f
+
+            echo "Deployed $JARVIS_VERSION"

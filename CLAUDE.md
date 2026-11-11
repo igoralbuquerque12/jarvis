@@ -11,7 +11,7 @@ Monorepo without a workspace tool — each app manages its own `node_modules`:
 - `ui ux/` — static design mockups (PNG), not code
 - `vibe-git/`, `vibe-git.config.json` — third-party commit/PR tooling config (conventional commits in English, PR bodies in pt-BR)
 
-`DEPLOYMENT.md` (pt-BR) is the source of truth for VPS deploy and the n8n network wiring.
+`docs/DEPLOYMENT.md` (pt-BR) is the source of truth for VPS deploy, the CI/CD pipeline and the n8n network wiring.
 
 ## Commands
 
@@ -34,6 +34,8 @@ npx prisma generate    # after any schema.prisma change
 Web commands run from `web/`: `npm run dev` (port 5173), `npm run build`, `npm run lint`.
 
 Docker (repo root): `docker compose up -d --build`. The `migrate` service runs `prisma migrate deploy` and the `server` service waits for it to exit 0 and for `redis` to become healthy. Never run `docker compose down -v` in production.
+
+CI/CD (`.github/workflows/deploy.yml`, on push to `main`): server unit tests → build and push `jarvis-server` / `jarvis-migrate` (`builder` stage) / `jarvis-web` to Docker Hub tagged `<VERSION>-<short sha>` (SemVer from the root `VERSION` file; no `latest`) → SSH into the VPS, `docker compose pull`, `run migrate`, `up -d --no-deps server web`, health check with rollback to the previous tag. `compose.yml` resolves those images through `JARVIS_IMAGE_NAMESPACE` / `JARVIS_VERSION` (defaults: `jarvis/*:local`). Bump `VERSION` with user-visible changes.
 
 Prisma reads its config from `server/prisma.config.ts` (schema path, seed command, `DATABASE_URL`) — `schema.prisma` has no `url` in its datasource block.
 

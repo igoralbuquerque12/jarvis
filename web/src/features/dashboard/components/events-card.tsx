@@ -110,7 +110,7 @@ export function EventsCard({
   return (
     <Card>
       <CardHeader
-        title="Próximos lembretes"
+        title="Seus próximos lembretes"
         subtitle="O que o Jarvis vai te enviar no WhatsApp."
         aside={
           locked ? undefined : (
