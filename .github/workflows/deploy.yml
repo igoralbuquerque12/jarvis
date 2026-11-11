@@ -135,41 +135,74 @@ jobs:
     name: Deploy to VPS
     needs: build
     runs-on: ubuntu-latest
+    env:
+      JARVIS_VERSION: ${{ needs.build.outputs.tag }}
+      JARVIS_IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME }}
+      JARVIS_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+    # One SSH step per stage, so the WhatsApp notification can name the one that
+    # failed. The notify job matches these step names: keep them in sync.
     steps:
-      - name: Pull new images and restart the app containers
+      - name: Pull images
         uses: appleboy/ssh-action@v1
         env:
-          JARVIS_VERSION: ${{ needs.build.outputs.tag }}
-          JARVIS_IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME }}
-          JARVIS_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
           DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: JARVIS_VERSION,JARVIS_IMAGE_NAMESPACE,JARVIS_IMAGE_SOURCE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          envs: JARVIS_VERSION,JARVIS_IMAGE_NAMESPACE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
           script: |
             set -eu
-
             cd /home/ubuntu/projects/jarvis
 
             # compose.yml and the vendored Securo sources still come from Git.
             git pull --ff-only origin main
 
-            touch .env
-            previous="$(sed -n 's/^JARVIS_VERSION=//p' .env | tail -n 1)"
-            echo "Deploying $JARVIS_VERSION (previous: ${previous:-none})"
-
             echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             docker compose pull migrate server web
             docker logout
 
-            # Migrations first; a failure stops the deploy with the old containers still up.
+      # A failure here stops the deploy with the old containers still up.
+      - name: Run migrations
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: JARVIS_VERSION,JARVIS_IMAGE_NAMESPACE
+          script: |
+            set -eu
+            cd /home/ubuntu/projects/jarvis
             docker compose run --rm -T migrate
 
-            # Recreate only the app containers; dependencies are left as they are.
+      # Recreate only the app containers; dependencies are left as they are.
+      - name: Restart server and web
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: JARVIS_VERSION,JARVIS_IMAGE_NAMESPACE
+          script: |
+            set -eu
+            cd /home/ubuntu/projects/jarvis
             docker compose up -d --no-deps --no-build server web
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: JARVIS_VERSION,JARVIS_IMAGE_NAMESPACE,JARVIS_IMAGE_SOURCE
+          script: |
+            set -eu
+            cd /home/ubuntu/projects/jarvis
+
+            # .env is only rewritten after a successful check, so it still names the previous version.
+            touch .env
+            previous="$(sed -n 's/^JARVIS_VERSION=//p' .env | tail -n 1)"
 
             sleep 20
             status="$(docker inspect -f '{{.State.Status}}' jarvis-server)"
@@ -193,4 +226,82 @@ jobs:
             docker image prune -af --filter "label=org.opencontainers.image.source=$JARVIS_IMAGE_SOURCE" --filter "until=336h"
             docker image prune -f
 
-            echo "Deployed $JARVIS_VERSION"
+            echo "Deployed $JARVIS_VERSION (previous: ${previous:-none})"
+
+  # Sends the outcome to the owner's WhatsApp through Jarvis' own public API
+  # (POST /v1/messages). Runs even when an earlier job failed: in every failure
+  # case the old (or rolled-back) version is still up to deliver it.
+  notify:
+    name: Notify on WhatsApp
+    needs: [test, build, deploy]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Send the deploy result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JARVIS_API_KEY: ${{ secrets.JARVIS_API_KEY }}
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          VERSION_TAG: ${{ needs.build.outputs.tag }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$JARVIS_API_KEY" ]; then
+            echo "::warning::Secret JARVIS_API_KEY is not set; skipping the WhatsApp notification"
+            exit 0
+          fi
+
+          version="${VERSION_TAG:-${GITHUB_SHA::7}}"
+          commit="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)"
+          commit="${commit:-execução manual}"
+
+          if [ "$DEPLOY_RESULT" = "success" ]; then
+            message="$(printf 'Deploy feito com sucesso!\n\nVersão: %s\nCommit: %s' "$version" "$commit")"
+          else
+            # First failed job and its first failed step, e.g. "Deploy to VPS|Health check".
+            failed="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+              --jq '[.jobs[] | select(.conclusion == "failure") | "\(.name)|\([.steps[]? | select(.conclusion == "failure") | .name] | first // "")"] | first // "|"')" || failed="|"
+            failed_job="${failed%%|*}"
+            failed_step="${failed#*|}"
+
+            case "$failed" in
+              "Test (server)|"*)          reason="os testes do backend falharam. Nada foi publicado; a versão atual segue no ar." ;;
+              "Build & push images|"*)    reason="o build das imagens falhou. Nada foi publicado; a versão atual segue no ar." ;;
+              *"|Pull images")            reason="a VPS não conseguiu baixar as imagens novas. A versão atual segue no ar." ;;
+              *"|Run migrations")         reason="as migrations do banco falharam. A versão atual segue no ar." ;;
+              *"|Restart server and web") reason="não foi possível recriar os containers server e web." ;;
+              *"|Health check")           reason="o server não ficou de pé 20 s depois de subir. O pipeline voltou para a versão anterior, se havia uma." ;;
+              *)                          reason="falha em ${failed_job:-etapa desconhecida}${failed_step:+ › $failed_step}." ;;
+            esac
+
+            message="$(printf 'Deploy falhou.\n\nVersão: %s\nCommit: %s\nMotivo: %s\n\nLogs: %s' "$version" "$commit" "$reason" "$RUN_URL")"
+          fi
+
+          body="$(jq -n --arg message "$message" '{message: $message}')"
+
+          # The API allows 1 request per minute per key, counted even when the send
+          # fails, so retries wait 65 s (e.g. WhatsApp still reconnecting -> 503).
+          for attempt in 1 2 3 4; do
+            status="$(curl -sS -o response.json -w '%{http_code}' --max-time 20 \
+              -X POST "https://$API_DOMAIN/v1/messages" \
+              -H "Authorization: Bearer $JARVIS_API_KEY" \
+              -H 'Content-Type: application/json' \
+              --data "$body")" || status="000"
+
+            if [ "$status" = "200" ] || [ "$status" = "201" ]; then
+              echo "WhatsApp notification sent (attempt $attempt)"
+              exit 0
+            fi
+
+            echo "Attempt $attempt failed: HTTP $status $(cat response.json 2>/dev/null || true)"
+            case "$status" in
+              000|429|502|503|504) if [ "$attempt" -lt 4 ]; then sleep 65; fi ;;
+              *) break ;;
+            esac
+          done
+
+          echo "::error::Could not send the WhatsApp notification (last HTTP $status)"
+          exit 1

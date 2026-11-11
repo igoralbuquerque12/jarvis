@@ -101,12 +101,22 @@ A tag e `<VERSION>-<hash curto do commit>`, por exemplo `1.4.2-a3f9c1b`. O SemVe
 | Variable | `API_DOMAIN` | Mesmo valor do `.env` da VPS; vai para o build do frontend. |
 | Variable | `VITE_WHATSAPP_NUMBER` | Opcional, mesmo valor do `.env` da VPS. |
 | Secret | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | Acesso SSH a VPS (ja usados antes). |
+| Secret | `JARVIS_API_KEY` | Opcional. Chave da API publica do Jarvis (`jrv_...`) usada para avisar o resultado do deploy no WhatsApp. Sem ela, o aviso e pulado. |
 
 Os repositorios do Docker Hub sao criados no primeiro push. Se ficarem privados, o deploy faz `docker login` na VPS com o mesmo token antes do `pull`.
 
 ### Health check e rollback
 
 Vinte segundos depois de subir, o deploy confere se o `jarvis-server` esta `running` sem reinicios. Se nao estiver, imprime os logs, volta `server` e `web` para a versao anterior e marca o job como falho. As migrations ja aplicadas **nao** sao desfeitas, entao mantenha as migrations compativeis com a versao anterior (adicionar colunas/tabelas, nunca remover no mesmo deploy).
+
+### Aviso no WhatsApp
+
+O ultimo job (`notify`) roda sempre, mesmo quando uma etapa anterior falha, e manda o resultado para o WhatsApp do dono da `JARVIS_API_KEY` usando a propria API publica do Jarvis (`POST https://<API_DOMAIN>/v1/messages`). Em todos os casos de falha a versao antiga (ou a restaurada pelo rollback) continua no ar para entregar a mensagem.
+
+- Sucesso: `Deploy feito com sucesso!` com a versao e o titulo do commit.
+- Falha: `Deploy falhou.` com a versao, o commit, o motivo (testes, build, pull, migrations, troca dos containers ou health check) e o link dos logs. O motivo vem do nome do passo que falhou: por isso o deploy e dividido em quatro passos SSH, e os nomes deles nao devem mudar sem atualizar o `case` do job `notify`.
+
+A API aceita 1 requisicao por minuto por chave, contando inclusive as que falham. Por isso, em `503` (WhatsApp ainda reconectando), `429`, `502`, `504` ou erro de rede, o job espera 65 s e tenta de novo, ate 4 vezes. Use uma chave so para o deploy, para nao disputar esse limite com outros usos. Se a mensagem nao sair, o job `notify` fica vermelho, mas o deploy em si ja terminou.
 
 Rollback manual para qualquer versao ainda presente no Docker Hub:
 
