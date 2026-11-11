@@ -45,7 +45,8 @@ jobs:
   build:
     name: Build & push images
     needs: test
-    runs-on: ubuntu-latest
+    # The VPS is ARM64: build natively on an ARM runner (free for public repos).
+    runs-on: ubuntu-24.04-arm
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
@@ -87,6 +88,7 @@ jobs:
         with:
           context: ./server
           target: production
+          platforms: linux/arm64
           push: true
           tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-server:${{ steps.meta.outputs.tag }}
           labels: |
@@ -102,6 +104,7 @@ jobs:
         with:
           context: ./server
           target: builder
+          platforms: linux/arm64
           push: true
           tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-migrate:${{ steps.meta.outputs.tag }}
           labels: |
@@ -115,6 +118,7 @@ jobs:
         with:
           context: ./web
           target: production
+          platforms: linux/arm64
           push: true
           tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-web:${{ steps.meta.outputs.tag }}
           build-args: |

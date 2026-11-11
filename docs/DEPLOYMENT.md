@@ -85,7 +85,7 @@ O volume `n8n_data` nao e removido nesses comandos, portanto credenciais, usuari
 Depois do primeiro `docker compose up`, as atualizacoes nao sao mais feitas a mao. Todo `git push` na `main` dispara `.github/workflows/deploy.yml`, que roda tres jobs em sequencia:
 
 1. **Test**: `npm ci`, `prisma generate` e `npm test` do `server/`. Se falhar, nada e publicado.
-2. **Build & push**: gera as imagens `jarvis-server` (stage `production`), `jarvis-migrate` (stage `builder`, que tem o CLI do Prisma) e `jarvis-web` (com `VITE_API_URL` embutido) e envia ao Docker Hub.
+2. **Build & push**: gera as imagens `jarvis-server` (stage `production`), `jarvis-migrate` (stage `builder`, que tem o CLI do Prisma) e `jarvis-web` (com `VITE_API_URL` embutido) e envia ao Docker Hub. As imagens sao **so `linux/arm64`**, porque a VPS e ARM; o build roda num runner ARM nativo (`ubuntu-24.04-arm`, gratuito em repositorio publico). Se a VPS mudar para x86, troque `platforms` para `linux/amd64` e o runner para `ubuntu-latest`.
 3. **Deploy**: entra na VPS por SSH, baixa as imagens novas, roda as migrations e recria **apenas** os containers `server` e `web`. Redis, Securo e Traefik nao sao tocados.
 
 ### Versao da imagem
