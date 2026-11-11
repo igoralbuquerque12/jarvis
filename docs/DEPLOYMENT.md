@@ -80,12 +80,48 @@ docker network connect jarvis-internal n8n
 
 O volume `n8n_data` nao e removido nesses comandos, portanto credenciais, usuarios e workflows sao preservados.
 
+## 4. CI/CD (GitHub Actions + Docker Hub)
+
+Depois do primeiro `docker compose up`, as atualizacoes nao sao mais feitas a mao. Todo `git push` na `main` dispara `.github/workflows/deploy.yml`, que roda tres jobs em sequencia:
+
+1. **Test**: `npm ci`, `prisma generate` e `npm test` do `server/`. Se falhar, nada e publicado.
+2. **Build & push**: gera as imagens `jarvis-server` (stage `production`), `jarvis-migrate` (stage `builder`, que tem o CLI do Prisma) e `jarvis-web` (com `VITE_API_URL` embutido) e envia ao Docker Hub.
+3. **Deploy**: entra na VPS por SSH, baixa as imagens novas, roda as migrations e recria **apenas** os containers `server` e `web`. Redis, Securo e Traefik nao sao tocados.
+
+### Versao da imagem
+
+A tag e `<VERSION>-<hash curto do commit>`, por exemplo `1.4.2-a3f9c1b`. O SemVer vem do arquivo `VERSION` na raiz: suba o numero nesse arquivo no mesmo commit da mudanca (correcao = patch, funcionalidade = minor, quebra de compatibilidade = major). Nao existe tag `latest`; a versao em execucao fica gravada em `JARVIS_VERSION` no `.env` da raiz da VPS e tambem nos labels da imagem (`docker inspect jarvis-server`).
+
+### Configuracao no GitHub (Settings → Secrets and variables → Actions)
+
+| Tipo | Nome | Valor |
+|---|---|---|
+| Variable | `DOCKERHUB_USERNAME` | Usuario (ou organizacao) do Docker Hub; vira o prefixo das imagens. |
+| Secret | `DOCKERHUB_TOKEN` | Access token do Docker Hub com permissao *Read & Write*. |
+| Variable | `API_DOMAIN` | Mesmo valor do `.env` da VPS; vai para o build do frontend. |
+| Variable | `VITE_WHATSAPP_NUMBER` | Opcional, mesmo valor do `.env` da VPS. |
+| Secret | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | Acesso SSH a VPS (ja usados antes). |
+
+Os repositorios do Docker Hub sao criados no primeiro push. Se ficarem privados, o deploy faz `docker login` na VPS com o mesmo token antes do `pull`.
+
+### Health check e rollback
+
+Vinte segundos depois de subir, o deploy confere se o `jarvis-server` esta `running` sem reinicios. Se nao estiver, imprime os logs, volta `server` e `web` para a versao anterior e marca o job como falho. As migrations ja aplicadas **nao** sao desfeitas, entao mantenha as migrations compativeis com a versao anterior (adicionar colunas/tabelas, nunca remover no mesmo deploy).
+
+Rollback manual para qualquer versao ainda presente no Docker Hub:
+
+```bash
+JARVIS_VERSION=1.4.1-9b2e0d4 docker compose up -d --no-deps server web
+```
+
+Depois edite `JARVIS_VERSION` no `.env` para que os proximos comandos manuais usem a mesma versao.
+
 ## Operacao
 
 ```bash
-# Atualizar codigo na VPS
-git pull
-docker compose up -d --build
+# Atualizar: basta dar push na main. Para refazer o deploy sem commit novo,
+# use "Run workflow" na aba Actions.
+# Na VPS, nao use `--build` em server/web: isso gravaria uma imagem local com a tag da versao publicada.
 
 # Ver logs do backend
 docker compose logs -f server
