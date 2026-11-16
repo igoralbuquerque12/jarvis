@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { KnowledgeIndexStatus } from '@prisma/client';
 import type { DatabaseInformation } from '@prisma/client';
 import { AiProvider } from '../../ai/contracts/ai-provider.contract';
 import { AiProviderError } from '../../ai/errors/ai-provider.error';
@@ -31,15 +32,25 @@ import {
   readDatabaseInformationText,
   toContentJson,
 } from '../utils/database-information-content';
+import { hashKnowledgeContent } from '../utils/knowledge-text';
+import { KnowledgeIndexerService } from './knowledge-indexer.service';
 
 const EXTRACTION_FAILED_MESSAGE =
   'Não foi possível analisar a base agora. Tente novamente.';
+
+/** Queues the base for indexing with a fresh attempt budget. */
+const PENDING_INDEX = {
+  indexStatus: KnowledgeIndexStatus.PENDING,
+  indexAttempts: 0,
+  indexError: null,
+};
 
 @Injectable()
 export class DatabaseInformationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiProvider,
+    private readonly indexer: KnowledgeIndexerService,
   ) {}
 
   findAllByProfile(profileId: string): Promise<DatabaseInformation[]> {
@@ -49,7 +60,11 @@ export class DatabaseInformationService {
     });
   }
 
-  /** Id, name and description only: the index placed in the assistant context. */
+  /**
+   * Id, name and description only: the index placed in the assistant context.
+   * Every base is listed, indexed or not: reading a whole base
+   * (`get_database_information`) does not depend on the RAG index.
+   */
   findIndexByProfile(profileId: string): Promise<KnowledgeIndexItem[]> {
     return this.prisma.databaseInformation.findMany({
       where: { profileId },
@@ -68,7 +83,10 @@ export class DatabaseInformationService {
     );
   }
 
-  /** Extracts name/description synchronously: nothing is saved if it fails. */
+  /**
+   * Extracts name/description synchronously (nothing is saved if it fails),
+   * then indexes the text for the RAG in background (status PENDING → READY).
+   */
   async create(
     profileId: string,
     data: CreateDatabaseInformationDto,
@@ -85,17 +103,25 @@ export class DatabaseInformationService {
 
     const { name, description } = await this.extract(data.content);
 
-    return this.prisma.databaseInformation.create({
+    const created = await this.prisma.databaseInformation.create({
       data: {
         profileId,
         name,
         description,
         content: toContentJson(data.content),
+        contentHash: hashKnowledgeContent(data.content),
       },
     });
+
+    this.indexer.indexInBackground(created.id);
+
+    return created;
   }
 
-  /** Re-extracts name/description whenever the content actually changes. */
+  /**
+   * Re-extracts name/description and re-indexes whenever the content actually
+   * changes. The old chunks stay out of the search until the new ones are in.
+   */
   async update(
     profileId: string,
     id: string,
@@ -109,12 +135,37 @@ export class DatabaseInformationService {
 
     const { name, description } = await this.extract(data.content);
 
-    return this.prisma.databaseInformation.update({
+    const updated = await this.prisma.databaseInformation.update({
       where: { id },
-      data: { name, description, content: toContentJson(data.content) },
+      data: {
+        name,
+        description,
+        content: toContentJson(data.content),
+        contentHash: hashKnowledgeContent(data.content),
+        ...PENDING_INDEX,
+      },
     });
+
+    this.indexer.indexInBackground(id);
+
+    return updated;
   }
 
+  /** Manual retry from the web, e.g. after a FAILED indexing. */
+  async reindex(profileId: string, id: string): Promise<DatabaseInformation> {
+    await this.findOwned(profileId, id);
+
+    const updated = await this.prisma.databaseInformation.update({
+      where: { id },
+      data: PENDING_INDEX,
+    });
+
+    this.indexer.indexInBackground(id);
+
+    return updated;
+  }
+
+  /** The chunks go with it: `knowledge_chunks` cascades on the base. */
   async remove(profileId: string, id: string): Promise<DatabaseInformation> {
     await this.findOwned(profileId, id);
 
