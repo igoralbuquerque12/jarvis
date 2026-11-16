@@ -7,6 +7,7 @@ import type {
   Goal,
   RecurringTransaction,
   Rule,
+  Transaction,
   TransactionPage,
 } from '../types/api';
 
@@ -20,7 +21,6 @@ export function createMyAccount(data: {
   name: string;
   type: string;
   currency?: string;
-  institution?: string;
   balance?: number;
 }): Promise<FinanceAccount> {
   return apiFetch<FinanceAccount>('/finance/me/accounts', {
@@ -70,8 +70,8 @@ export function createMyTransaction(data: {
   categoryId?: string;
   notes?: string;
   currency?: string;
-}): Promise<unknown> {
-  return apiFetch('/finance/me/transactions', {
+}): Promise<Transaction> {
+  return apiFetch<Transaction>('/finance/me/transactions', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -88,8 +88,8 @@ export function updateMyTransaction(
     categoryId: string;
     notes: string;
   }>,
-): Promise<unknown> {
-  return apiFetch(`/finance/me/transactions/${id}`, {
+): Promise<Transaction> {
+  return apiFetch<Transaction>(`/finance/me/transactions/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
@@ -193,8 +193,10 @@ export function createMyRecurring(data: {
   amount: number;
   type: 'debit' | 'credit';
   frequency: string;
+  /** YYYY-MM-DD; the first occurrence is computed from it. */
+  startDate: string;
   dayOfMonth?: number;
-  dayOfWeek?: number;
+  endDate?: string;
   currency?: string;
   categoryId?: string;
   accountId?: string;
@@ -243,9 +245,16 @@ export function getMyAssetTrades(assetId: string): Promise<AssetTrade[]> {
 
 export function createMyAssetTrade(
   assetId: string,
-  data: { type: 'buy' | 'sell'; units: number; price: number; date: string },
-): Promise<AssetTrade> {
-  return apiFetch<AssetTrade>(`/finance/me/assets/${assetId}/trades`, {
+  data: {
+    kind: 'buy' | 'sell';
+    quantity: number;
+    price: number;
+    date: string;
+    fee?: number;
+    notes?: string;
+  },
+): Promise<Asset> {
+  return apiFetch<Asset>(`/finance/me/assets/${assetId}/trades`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
