@@ -15,6 +15,7 @@ import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateRecurringTransactionDto } from '../dto/create-recurring-transaction.dto';
 import { UpdateRecurringTransactionDto } from '../dto/update-recurring-transaction.dto';
 import { RecurringTransactionsService } from '../services/recurring-transactions.service';
+import { toRecurringTransactionView } from '../entities/recurring-transaction.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -30,9 +31,11 @@ export class RecurringTransactionsController {
   @Get()
   async findMyRecurringTransactions(@Req() request: Request) {
     const profile = await this.requireProfile(request);
-    return this.recurringTransactionsService.findRecurringTransactions(
-      profile.id,
-    );
+    const recurring =
+      await this.recurringTransactionsService.findRecurringTransactions(
+        profile.id,
+      );
+    return recurring.map(toRecurringTransactionView);
   }
 
   @Post()
@@ -41,9 +44,11 @@ export class RecurringTransactionsController {
     @Body() data: CreateRecurringTransactionDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.recurringTransactionsService.createRecurringTransaction(
-      profile.id,
-      data,
+    return toRecurringTransactionView(
+      await this.recurringTransactionsService.createRecurringTransaction(
+        profile.id,
+        data,
+      ),
     );
   }
 
@@ -55,10 +60,12 @@ export class RecurringTransactionsController {
     @Body() data: UpdateRecurringTransactionDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.recurringTransactionsService.updateRecurringTransaction(
-      profile.id,
-      recurringTransactionId,
-      data,
+    return toRecurringTransactionView(
+      await this.recurringTransactionsService.updateRecurringTransaction(
+        profile.id,
+        recurringTransactionId,
+        data,
+      ),
     );
   }
 
