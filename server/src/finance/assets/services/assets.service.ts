@@ -5,6 +5,11 @@ import { SecuroContextService } from '../../core/services/securo-context.service
 import { CreateAssetDto } from '../dto/create-asset.dto';
 import { CreateAssetTradeDto } from '../dto/create-asset-trade.dto';
 import { CreateAssetValueDto } from '../dto/create-asset-value.dto';
+import {
+  SecuroAsset,
+  SecuroAssetTrade,
+  SecuroAssetValue,
+} from '../entities/asset.view';
 
 @Injectable()
 export class AssetsService {
@@ -16,7 +21,7 @@ export class AssetsService {
   async findAssets(profileId: string) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroAsset[]>({
       method: 'GET',
       path: '/api/assets',
       ...this.securoContext.auth(context),
@@ -26,7 +31,7 @@ export class AssetsService {
   async createAsset(profileId: string, data: CreateAssetDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroAsset>({
       method: 'POST',
       path: '/api/assets',
       ...this.securoContext.auth(context),
@@ -50,7 +55,7 @@ export class AssetsService {
   ) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroAssetValue>({
       method: 'POST',
       path: `/api/assets/${assetId}/values`,
       ...this.securoContext.auth(context),
@@ -68,7 +73,7 @@ export class AssetsService {
   ) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroAsset>({
       method: 'POST',
       path: `/api/assets/${assetId}/transactions`,
       ...this.securoContext.auth(context),
@@ -86,7 +91,7 @@ export class AssetsService {
   async findAssetTrades(profileId: string, assetId: string) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroAssetTrade[]>({
       method: 'GET',
       path: `/api/assets/${assetId}/transactions`,
       ...this.securoContext.auth(context),
