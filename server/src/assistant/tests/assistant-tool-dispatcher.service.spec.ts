@@ -68,9 +68,12 @@ describe('AssistantToolDispatcherService', () => {
     ).resolves.toEqual({ ok: 'events' });
 
     expect(toolsService.forProfile).toHaveBeenCalledWith(profile);
-    expect(events.execute).toHaveBeenCalledWith(profile.id, 'create_event', {
-      content: 'x',
-    });
+    expect(events.execute).toHaveBeenCalledWith(
+      profile.id,
+      'create_event',
+      { content: 'x' },
+      { runId },
+    );
     expect(finance.execute).not.toHaveBeenCalled();
   });
 
@@ -86,6 +89,7 @@ describe('AssistantToolDispatcherService', () => {
       profile.id,
       'list_accounts',
       {},
+      { runId },
     );
   });
 

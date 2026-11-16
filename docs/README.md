@@ -6,7 +6,7 @@
 
 [![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com)
 [![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)](https://neon.tech)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev)
@@ -98,7 +98,7 @@ O projeto é um monorepo com backend NestJS, frontend React, um workflow n8n ver
 | **Web app** | React 19 + Vite. Login, dashboard, finanças, perfil, planos, chaves de API e documentação da API. |
 | **n8n + LLM** | Orquestra o agente: valida o payload, monta o prompt, roda o modelo com function calling e devolve uma resposta em texto. |
 | **Securo** | Motor financeiro invisível para o usuário. FastAPI + Postgres + Celery, rodando na rede interna. |
-| **PostgreSQL (Neon)** | Banco do Jarvis: usuários, perfis, mensagens, eventos, chaves, credenciais do WhatsApp. |
+| **PostgreSQL + pgvector** | Banco do Jarvis (serviço `postgres` do compose): usuários, perfis, mensagens, eventos, chaves, credenciais do WhatsApp e os trechos indexados das bases de conhecimento. Sem backup automático. |
 | **Redis** | Cache do scheduler de eventos e dos tokens do Securo. Também é o broker do Celery do Securo (database 1). |
 | **Sistemas externos** | Qualquer script do usuário autenticado com uma chave `jrv_…` na API pública. |
 
@@ -128,7 +128,7 @@ Pontos que valem destaque:
 - **Ordem de subida garantida pelo compose**: o `server` só sobe depois que `migrate` (Prisma) terminou com código 0, `redis` está saudável e `securo-backend` iniciou; o Securo, por sua vez, espera suas próprias migrations Alembic.
 - **O n8n é um container à parte**, conectado à rede `jarvis-internal` uma única vez (`docker network connect`). Ele chama o backend por `http://server:3000` e o backend o chama por `http://n8n:5678`. A configuração do n8n é feita por túnel SSH, sem expor a porta.
 - **Um Redis, dois usos**: database 0 para o Jarvis, database 1 para o Securo. Persistência AOF em volume.
-- **O banco do Jarvis é gerenciado (Neon)**; o do Securo é local, em volume Docker.
+- **Os bancos são locais, em volume Docker**: o do Jarvis no serviço `postgres` e o do Securo no `securo-db`.
 
 ### Modelo de dados
 
@@ -162,7 +162,7 @@ O diagrama de onboarding e os detalhes de cada etapa estão no [documento de arq
 | Camada | Tecnologia | Observações |
 |---|---|---|
 | Backend | **NestJS 11**, TypeScript 5.7, Node 22 | Módulos por domínio, `ValidationPipe` global com `whitelist` + `forbidNonWhitelisted`. |
-| ORM / banco | **Prisma 7** + `@prisma/adapter-pg`, **PostgreSQL** (Neon) | Driver adapter obrigatório para o pooler do Neon. 10 migrations versionadas. |
+| ORM / banco | **Prisma 7** + `@prisma/adapter-pg`, **PostgreSQL 16 + pgvector** | Postgres local no compose. Os embeddings das bases usam SQL cru (coluna `vector(1536)`). |
 | Cache | **Redis 7** (`redis` v6 client) | Janela do scheduler, tokens do Securo. |
 | WhatsApp | **Baileys 7** | Sessão persistida no Postgres, cifrada com AES-256-GCM. |
 | Autenticação | **better-auth 1.6** | E-mail/senha e Google. Montado fora do pipeline do Nest. |
@@ -229,7 +229,8 @@ Convenções: módulos seguem `controllers/ services/ dto/ entities/ utils/ sche
 
 - **Node.js 22** e npm 10
 - **Docker** com Compose v2
-- Um **PostgreSQL** para o Jarvis. Pode ser um banco gratuito no [Neon](https://neon.tech) (use a URL do *pooler* com `sslmode=require`) ou um Postgres local qualquer.
+- O **PostgreSQL com pgvector** do Jarvis vem no compose (serviço `postgres`): defina `JARVIS_DB_PASSWORD` no `.env` da raiz e rode `docker compose up -d postgres`. Ele publica a porta só em `127.0.0.1:5432`, para o backend rodando fora do Docker.
+- Uma **chave da OpenAI** (`OPENAI_API_KEY`), obrigatória para os embeddings das bases de conhecimento.
 - Uma **conta Groq** (ou outro provedor com function calling) para o modelo.
 - Um **número de WhatsApp dedicado** ao assistente, num celular onde você consiga escanear um QR code.
 
@@ -346,7 +347,7 @@ node docs/diagrams/render.mjs            # re-renderiza os diagramas desta docum
 | Variável | Obrigatória | Descrição |
 |---|---|---|
 | `PORT` | não | Porta HTTP do NestJS. Padrão `3000`. |
-| `DATABASE_URL` | **sim** | URL do PostgreSQL. No Neon, use o *pooler* com `?sslmode=require`. |
+| `DATABASE_URL` | **sim** (dev local) | `postgresql://jarvis:<JARVIS_DB_PASSWORD>@localhost:5432/jarvis`. No Docker o compose sobrescreve com o host `postgres`. |
 | `REDIS_URL` | **sim** | `redis://localhost:6379` em dev. O compose injeta `redis://redis:6379`. |
 | `BETTER_AUTH_URL` | **sim** | URL pública da API (base dos endpoints `/api/auth`). O compose injeta `https://${API_DOMAIN}`. |
 | `BETTER_AUTH_SECRET` | **sim** | Segredo de assinatura das sessões. |
@@ -356,8 +357,10 @@ node docs/diagrams/render.mjs            # re-renderiza os diagramas desta docum
 | `WHATSAPP_ADMIN_API_KEY` | **sim** | Chave dos endpoints administrativos (`/whatsapp/*`). |
 | `ASSISTANT_WORKFLOW_URL` | **sim** | URL do webhook do n8n. Em produção `http://n8n:5678/webhook/assistant`. |
 | `ASSISTANT_WORKFLOW_KEY` | **sim** | Enviada como `x-api-key` para o webhook e exigida nos endpoints que o n8n chama (`/assistant-m2m/*`). Deve bater com a credencial Header Auth do n8n. |
-| `AI_PROVIDER` | **sim** | Provedor de IA da extração de bases de conhecimento: `openai` ou `groq`. |
-| `OPENAI_API_KEY` / `GROQ_API_KEY` | **sim** (a do provedor escolhido) | Sem a chave do provedor em `AI_PROVIDER`, o servidor não sobe. |
+| `AI_EXTRACTION_PROVIDER` | não (padrão `openai`) | Provedor da extração de nome e descrição das bases: `openai` ou `groq`. Substitui `AI_PROVIDER`, que agora derruba o boot. |
+| `AI_EMBEDDING_PROVIDER` | não (padrão `openai`) | Provedor dos embeddings do RAG das bases. Só `openai`. |
+| `OPENAI_API_KEY` | **sim** | Sempre obrigatória (embeddings). Sem ela o servidor não sobe. |
+| `GROQ_API_KEY` | só com `AI_EXTRACTION_PROVIDER=groq` | Chave da Groq para a extração. |
 | `SECURO_API_URL` | **sim** | `http://localhost:8000` em dev. O compose injeta `http://securo-backend:8000`. |
 | `SECURO_ADMIN_EMAIL` / `SECURO_ADMIN_PASSWORD` | **sim** | Usuário de serviço do Securo, criado automaticamente no primeiro boot. |
 | `SECURO_PROVISION_SECRET` | **sim** | Deriva a senha de cada perfil no Securo. **Não trocar depois de provisionar usuários.** |

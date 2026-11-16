@@ -14,7 +14,13 @@ export interface AssistantToolHandler {
     profileId: string,
     operation: string,
     data: Record<string, unknown>,
+    context?: AssistantToolContext,
   ): Promise<unknown>;
+}
+
+/** Facts about the call that come from the run, never from the model. */
+export interface AssistantToolContext {
+  runId: string;
 }
 
 /** Marks a provider as the handler of the tool with the given name. */

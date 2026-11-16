@@ -27,6 +27,15 @@ export function updateMyDatabaseInformation(
   });
 }
 
+export function reindexMyDatabaseInformation(
+  id: string,
+): Promise<DatabaseInformation> {
+  return apiFetch<DatabaseInformation>(
+    `/database-information/me/${id}/reindex`,
+    { method: 'POST' },
+  );
+}
+
 export function deleteMyDatabaseInformation(id: string): Promise<null> {
   return apiFetch<null>(`/database-information/me/${id}`, {
     method: 'DELETE',

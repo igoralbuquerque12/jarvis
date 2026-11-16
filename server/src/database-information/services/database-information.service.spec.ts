@@ -3,7 +3,9 @@ import { AiProvider } from '../../ai/contracts/ai-provider.contract';
 import { AiProviderError } from '../../ai/errors/ai-provider.error';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { MAX_DATABASE_INFORMATION_PER_PROFILE } from '../constants/database-information.constant';
+import { hashKnowledgeContent } from '../utils/knowledge-text';
 import { DatabaseInformationService } from './database-information.service';
+import { KnowledgeIndexerService } from './knowledge-indexer.service';
 
 describe('DatabaseInformationService', () => {
   const profileId = 'profile-1';
@@ -13,23 +15,31 @@ describe('DatabaseInformationService', () => {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
-      create: jest.fn((args: { data: object }) => Promise.resolve(args.data)),
+      create: jest.fn((args: { data: object }) =>
+        Promise.resolve({ id: 'db-new', ...args.data }),
+      ),
       update: jest.fn((args: { data: object }) => Promise.resolve(args.data)),
       delete: jest.fn(),
     };
     const prisma = { databaseInformation } as unknown as PrismaService;
     const ai = { extract } as unknown as AiProvider;
+    const indexer = { indexInBackground: jest.fn() };
 
     return {
       databaseInformation,
       extract,
-      service: new DatabaseInformationService(prisma, ai),
+      indexer,
+      service: new DatabaseInformationService(
+        prisma,
+        ai,
+        indexer as unknown as KnowledgeIndexerService,
+      ),
     };
   }
 
   describe('create', () => {
     it('saves the extracted name and description with the text as content', async () => {
-      const { service, databaseInformation, extract } = makeService(
+      const { service, databaseInformation, extract, indexer } = makeService(
         jest.fn().mockResolvedValue({
           name: '  Clientes VIP ',
           description: ' Lista de clientes. ',
@@ -47,8 +57,10 @@ describe('DatabaseInformationService', () => {
           name: 'Clientes VIP',
           description: 'Lista de clientes.',
           content: { text: 'João; Maria' },
+          contentHash: hashKnowledgeContent('João; Maria'),
         },
       });
+      expect(indexer.indexInBackground).toHaveBeenCalledWith('db-new');
     });
 
     it('blocks at the limit before calling the AI', async () => {
@@ -89,8 +101,8 @@ describe('DatabaseInformationService', () => {
   describe('update', () => {
     const existing = { id: 'db-1', profileId, content: { text: 'antigo' } };
 
-    it('re-extracts and saves when the content changes', async () => {
-      const { service, databaseInformation, extract } = makeService(
+    it('re-extracts, saves and re-indexes when the content changes', async () => {
+      const { service, databaseInformation, extract, indexer } = makeService(
         jest.fn().mockResolvedValue({ name: 'Novo', description: 'Nova desc' }),
       );
       databaseInformation.findFirst.mockResolvedValue(existing);
@@ -104,12 +116,17 @@ describe('DatabaseInformationService', () => {
           name: 'Novo',
           description: 'Nova desc',
           content: { text: 'novo' },
+          contentHash: hashKnowledgeContent('novo'),
+          indexStatus: 'PENDING',
+          indexAttempts: 0,
+          indexError: null,
         },
       });
+      expect(indexer.indexInBackground).toHaveBeenCalledWith('db-1');
     });
 
-    it('skips the AI when the content is unchanged', async () => {
-      const { service, databaseInformation, extract } = makeService();
+    it('skips the AI and the indexing when the content is unchanged', async () => {
+      const { service, databaseInformation, extract, indexer } = makeService();
       databaseInformation.findFirst.mockResolvedValue(existing);
 
       await expect(
@@ -117,6 +134,7 @@ describe('DatabaseInformationService', () => {
       ).resolves.toBe(existing);
       expect(extract).not.toHaveBeenCalled();
       expect(databaseInformation.update).not.toHaveBeenCalled();
+      expect(indexer.indexInBackground).not.toHaveBeenCalled();
     });
 
     it('keeps the old data when the AI fails', async () => {
@@ -188,6 +206,34 @@ describe('DatabaseInformationService', () => {
       await expect(
         service.findOneForAssistant(profileId, 'db-1'),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('reindex', () => {
+    it('queues an owned base again with a fresh attempt budget', async () => {
+      const { service, databaseInformation, indexer } = makeService();
+      databaseInformation.findFirst.mockResolvedValue({
+        id: 'db-1',
+        profileId,
+      });
+
+      await service.reindex(profileId, 'db-1');
+
+      expect(databaseInformation.update).toHaveBeenCalledWith({
+        where: { id: 'db-1' },
+        data: { indexStatus: 'PENDING', indexAttempts: 0, indexError: null },
+      });
+      expect(indexer.indexInBackground).toHaveBeenCalledWith('db-1');
+    });
+
+    it('404s for a base owned by another profile', async () => {
+      const { service, databaseInformation, indexer } = makeService();
+      databaseInformation.findFirst.mockResolvedValue(null);
+
+      await expect(service.reindex(profileId, 'db-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(indexer.indexInBackground).not.toHaveBeenCalled();
     });
   });
 

@@ -6,14 +6,21 @@ x-securo-env: &securo-env
   REDIS_URL: redis://redis:6379/1
   STORAGE_LOCAL_PATH: /app/data/attachments
 
+x-jarvis-database-url: &jarvis-database-url postgresql://jarvis:${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}@postgres:5432/jarvis
+
 services:
   migrate:
     image: ${JARVIS_IMAGE_NAMESPACE:-jarvis}/jarvis-migrate:${JARVIS_VERSION:-local}
     build:
       context: ./server
       target: builder
+    depends_on:
+      postgres:
+        condition: service_healthy
     env_file:
       - ./server/.env
+    environment:
+      DATABASE_URL: *jarvis-database-url
     command: npx prisma migrate deploy
     networks:
       - jarvis-internal
@@ -29,6 +36,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       securo-backend:
@@ -38,6 +47,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
+      DATABASE_URL: *jarvis-database-url
       REDIS_URL: redis://redis:6379
       SECURO_API_URL: http://securo-backend:8000
       WEB_ORIGIN: https://${FRONTEND_DOMAIN}
@@ -77,6 +87,26 @@ services:
     networks:
       - jarvis-internal
       - proxy
+
+  postgres:
+    container_name: jarvis-postgres
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}
+      POSTGRES_DB: jarvis
+    ports:
+      - "127.0.0.1:${JARVIS_DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jarvis-internal
 
   securo-db:
     image: pgvector/pgvector:pg16
@@ -174,6 +204,7 @@ networks:
     name: proxy
 
 volumes:
+  postgres-data:
   redis-data:
   securo-pgdata:
   securo-attachments:

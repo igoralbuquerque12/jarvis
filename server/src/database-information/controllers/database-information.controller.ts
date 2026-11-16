@@ -68,6 +68,22 @@ export class DatabaseInformationController {
     return toDatabaseInformationView(updated);
   }
 
+  /** Queues the base for indexing again (e.g. after a failure). */
+  @Post('me/:id/reindex')
+  @HttpCode(200)
+  async reindexMine(
+    @Req() request: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const profile = await this.requireProfile(request);
+    const updated = await this.databaseInformationService.reindex(
+      profile.id,
+      id,
+    );
+
+    return toDatabaseInformationView(updated);
+  }
+
   @Delete('me/:id')
   @HttpCode(204)
   async removeMine(

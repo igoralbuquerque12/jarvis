@@ -1,6 +1,6 @@
 # Deploy interno do Jarvis e integracao com n8n
 
-Este projeto sobe dois containers: `server` e `migrate`. Nenhum deles publica porta no host. Eles se comunicam pela rede Docker privada `jarvis-internal`; ela tambem permite saidas necessarias do backend, como a conexao com o PostgreSQL do Neon, WhatsApp e chamadas a APIs externas.
+Do lado do Jarvis, este projeto sobe os containers `server`, `web`, `migrate`, `postgres` (o banco do Jarvis, com pgvector), alem de Redis e Securo. Nenhum deles publica porta para a internet: so o `postgres` publica a 5432 no `127.0.0.1` da VPS, para dev e tunel SSH. Eles se comunicam pela rede Docker privada `jarvis-internal`; ela tambem permite saidas necessarias do backend, como WhatsApp e chamadas a APIs externas (OpenAI, Groq).
 
 O n8n deve ser conectado a essa rede para receber chamadas do backend em `http://n8n:5678`. O n8n continua tambem na sua rede `bridge` padrao, preservando o acesso dele a APIs externas.
 
@@ -13,9 +13,12 @@ git clone <URL_DO_SEU_REPOSITORIO> jarvis
 cd jarvis
 cp server/.env.example server/.env
 nano server/.env
+nano .env
 ```
 
-No arquivo `server/.env`, cole a `DATABASE_URL` de pooler fornecida pelo Neon (ela deve conter `sslmode=require`). Preencha tambem `WHATSAPP_AUTH_ENCRYPTION_KEY` e `ASSISTANT_WORKFLOW_KEY`. Defina ainda `AI_PROVIDER` (`openai` ou `groq`) e a chave do provedor escolhido (`OPENAI_API_KEY` ou `GROQ_API_KEY`): sem ela o servidor nao sobe.
+No `.env` da raiz (interpolacao do `compose.yml`), defina `JARVIS_DB_PASSWORD`, a senha do Postgres do Jarvis. Ela entra numa URL de conexao, entao precisa ser URL-safe; gere com `openssl rand -hex 24`. Sem ela o `docker compose` recusa subir. Opcionalmente, `JARVIS_DB_HOST_PORT` troca a porta publicada no `127.0.0.1` (padrao `5432`).
+
+No arquivo `server/.env`, preencha `WHATSAPP_AUTH_ENCRYPTION_KEY` e `ASSISTANT_WORKFLOW_KEY`. Defina ainda `AI_EXTRACTION_PROVIDER` (`openai` ou `groq`, gera nome e descricao das bases de conhecimento), `AI_EMBEDDING_PROVIDER=openai` (embeddings do RAG das bases) e `OPENAI_API_KEY`, que e sempre obrigatoria; `GROQ_API_KEY` so e exigida com `AI_EXTRACTION_PROVIDER=groq`. Sem as chaves o servidor nao sobe, e a variavel antiga `AI_PROVIDER` sozinha tambem derruba o boot. A `DATABASE_URL` do `server/.env` so vale para o dev local (`localhost:5432`): no Docker o compose injeta em `server` e `migrate` a URL do servico `postgres`.
 
 Depois suba o projeto:
 
@@ -25,7 +28,7 @@ docker compose ps
 docker compose logs -f server
 ```
 
-O primeiro inicio aplica as migrations antes de subir o backend. Confirme que o container `migrate` terminou com codigo zero; ele pode aparecer como `exited (0)`, o que e esperado.
+O primeiro inicio sobe o `postgres`, espera ele ficar saudavel e aplica as migrations antes de subir o backend (a migration `20261111151719_add_knowledge_rag` habilita a extensao `vector`, que ja vem na imagem `pgvector/pgvector:pg16`). Confirme que o container `migrate` terminou com codigo zero; ele pode aparecer como `exited (0)`, o que e esperado.
 
 ## 2. Conectar o n8n a rede interna
 
@@ -80,13 +83,59 @@ docker network connect jarvis-internal n8n
 
 O volume `n8n_data` nao e removido nesses comandos, portanto credenciais, usuarios e workflows sao preservados.
 
-## 4. CI/CD (GitHub Actions + Docker Hub)
+Sempre que o `n8n.json` do repositorio mudar (por exemplo, o no *Build prompt*), copie o no alterado para o workflow de producao por esse tunel: o deploy do CI nao atualiza o n8n. Nao importe o arquivo inteiro, porque o no *Config* do export aponta para um devtunnel de desenvolvimento.
+
+## 4. Banco do Jarvis (Postgres local)
+
+O banco do Jarvis e o servico `postgres` do `compose.yml` (container `jarvis-postgres`, imagem `pgvector/pgvector:pg16`, database e usuario `jarvis`, senha `JARVIS_DB_PASSWORD`, dados no volume `postgres-data`). O Securo continua com o proprio `securo-db`, separado. O compose injeta a `DATABASE_URL` (`postgresql://jarvis:<senha>@postgres:5432/jarvis`) em `server` e `migrate`, sobrescrevendo a do `server/.env`.
+
+Para abrir o banco a partir da sua maquina, use um tunel SSH (a porta so escuta no `127.0.0.1` da VPS):
+
+```bash
+ssh -N -L 5432:127.0.0.1:5432 <USUARIO>@<IP_DA_VPS>
+# em outro terminal: postgresql://jarvis:<JARVIS_DB_PASSWORD>@localhost:5432/jarvis
+```
+
+Na propria VPS: `docker compose exec postgres psql -U jarvis -d jarvis`.
+
+### Dump e restauracao manuais
+
+**Nao ha backup automatico do banco.** Se o disco ou a VPS se perderem, os dados do Jarvis (inclusive a sessao do WhatsApp) vao junto. Antes de uma operacao arriscada, tire um dump a mao e guarde fora da VPS:
+
+```bash
+docker compose exec -T postgres pg_dump --format=custom --no-owner -U jarvis -d jarvis > jarvis-$(date -u +%Y%m%dT%H%M%SZ).dump
+scp <USUARIO>@<IP_DA_VPS>:<PASTA_DO_JARVIS>/jarvis-<timestamp>.dump .   # na sua maquina
+```
+
+Para restaurar, pare o backend antes, para ninguem escrever no banco durante a restauracao:
+
+```bash
+docker compose stop server
+docker compose cp ./<arquivo>.dump postgres:/tmp/restore.dump
+docker compose exec -T postgres pg_restore --clean --if-exists --no-owner -U jarvis -d jarvis /tmp/restore.dump
+docker compose exec postgres rm /tmp/restore.dump
+docker compose start server
+```
+
+Um dump feito com `pg_dump` 17 (por exemplo, o do Neon) nao e lido pelo `pg_restore` 16 do container `postgres`: nesse caso rode o `pg_restore` de uma imagem `postgres:17` na rede `jarvis-internal` (`docker run --rm --network jarvis-internal -v "$PWD:/in" -e PGPASSWORD=<JARVIS_DB_PASSWORD> postgres:17 pg_restore --no-owner -h postgres -U jarvis -d jarvis /in/<arquivo>.dump`). O dump inclui a sessao do WhatsApp (`whatsapp_auth`, cifrada): ela so volta a funcionar com a mesma `WHATSAPP_AUTH_ENCRYPTION_KEY`; se a chave for outra, leia o QR de novo.
+
+### Trocar a senha do banco
+
+O `JARVIS_DB_PASSWORD` so e aplicado quando o volume `postgres-data` e criado. Trocar o valor no `.env` depois **nao** muda a senha dentro do banco, e o `server` passa a falhar ao conectar. Para trocar:
+
+```bash
+docker compose exec postgres psql -U jarvis -d jarvis -c "ALTER USER jarvis PASSWORD '<nova senha URL-safe>'"
+# edite JARVIS_DB_PASSWORD no .env da raiz com o mesmo valor
+docker compose up -d --no-deps --force-recreate server
+```
+
+## 5. CI/CD (GitHub Actions + Docker Hub)
 
 Depois do primeiro `docker compose up`, as atualizacoes nao sao mais feitas a mao. Todo `git push` na `main` dispara `.github/workflows/deploy.yml`, que roda tres jobs em sequencia:
 
 1. **Test**: `npm ci`, `prisma generate` e `npm test` do `server/`. Se falhar, nada e publicado.
 2. **Build & push**: gera as imagens `jarvis-server` (stage `production`), `jarvis-migrate` (stage `builder`, que tem o CLI do Prisma) e `jarvis-web` (com `VITE_API_URL` embutido) e envia ao Docker Hub. As imagens sao **so `linux/arm64`**, porque a VPS e ARM; o build roda num runner ARM nativo (`ubuntu-24.04-arm`, gratuito em repositorio publico). Se a VPS mudar para x86, troque `platforms` para `linux/amd64` e o runner para `ubuntu-latest`.
-3. **Deploy**: entra na VPS por SSH, baixa as imagens novas, roda as migrations e recria **apenas** os containers `server` e `web`. Redis, Securo e Traefik nao sao tocados.
+3. **Deploy**: entra na VPS por SSH, atualiza o checkout (`git pull`, que traz o `compose.yml`), baixa as imagens novas, roda as migrations e recria **apenas** os containers `server` e `web`. Redis, Securo, Traefik e `postgres` nao sao recriados; o `docker compose run migrate` so sobe o `postgres` (pelo `depends_on`) se ele nao estiver de pe.
 
 ### Versao da imagem
 
@@ -126,6 +175,38 @@ JARVIS_VERSION=1.4.1-9b2e0d4 docker compose up -d --no-deps server web
 
 Depois edite `JARVIS_VERSION` no `.env` para que os proximos comandos manuais usem a mesma versao.
 
+## 6. Corte do Neon para o Postgres local (versao 1.1.0)
+
+Ate a versao 1.0.x o banco do Jarvis era o Neon. A partir da 1.1.0 ele e o servico `postgres` do compose (secao 4). **Nao ha migracao de dados**: o banco novo comeca zerado e todas as migrations rodam do zero. Isso apaga, na pratica, usuarios, perfis, eventos, bases de conhecimento, chaves de API e a sessao do WhatsApp. O Securo nao muda (continua no `securo-db`), mas os usuarios novos do Jarvis ganham usuarios novos no Securo.
+
+### Antes do deploy (na VPS)
+
+1. No `.env` da raiz, adicione `JARVIS_DB_PASSWORD` (gere com `openssl rand -hex 24`). Sem ela o `docker compose` recusa interpolar o arquivo e o deploy para no passo *Pull images*, com a versao antiga no ar.
+2. No `server/.env`:
+   - renomeie `AI_PROVIDER` para `AI_EXTRACTION_PROVIDER` (a antiga sozinha derruba o boot);
+   - adicione `AI_EMBEDDING_PROVIDER=openai`;
+   - garanta `OPENAI_API_KEY` preenchida (agora sempre obrigatoria, por causa dos embeddings);
+   - a `DATABASE_URL` do Neon pode ficar no arquivo, mas deixa de ser usada no Docker (o compose sobrescreve).
+
+### Deploy
+
+3. Faca o push na `main` (ou "Run workflow"). O deploy normal do CI resolve o resto: o `docker compose run migrate` sobe o `postgres` pelo `depends_on`, espera o healthcheck e aplica todas as migrations no banco vazio; em seguida o `up -d --no-deps server web` funciona porque o `postgres` ja esta de pe.
+4. **O aviso do `notify` desse primeiro deploy vai falhar**: a API key do secret `JARVIS_API_KEY` existia so no Neon. O deploy em si nao e afetado.
+
+### Depois do deploy
+
+5. Leia o QR do WhatsApp de novo, porque a tabela `whatsapp_auth` comecou vazia: `curl -s https://<API_DOMAIN>/whatsapp/qr -H "x-admin-key: <WHATSAPP_ADMIN_API_KEY>"` e abra a *data URL* devolvida. `GET /whatsapp/status` confirma a conexao.
+6. Todos os usuarios precisam se cadastrar de novo no painel e parear o WhatsApp com o token novo. So o Free Tier (plano 1) e recriado sozinho; se havia outros planos ou perfis em plano superior, recrie-os no banco novo (por exemplo, com `psql` no container `postgres`).
+7. Recrie a sua API key em *Configuracoes → API* e atualize o secret `JARVIS_API_KEY` no GitHub.
+8. Atualize o n8n pelo tunel (secao 3): copie o codigo do no *Build prompt* do `n8n.json` para o workflow de producao, que ganhou o bloco "# Regra obrigatoria das bases de conhecimento". **Nao importe o arquivo inteiro**: o `n8n.json` do repositorio tem o no *Config* apontando para um devtunnel e o webhook `assistant-development`.
+10. Cadastre de novo as bases de conhecimento; cada uma deve chegar a "Pronta para busca" no painel.
+
+### Desligar o Neon
+
+Mantenha o projeto no Neon por alguns dias, ate o Postgres local estar estavel; so entao desligue-o. **Nunca** use `docker compose down -v`: ele apaga o volume `postgres-data`, com todo o banco.
+
+Se precisar voltar atras, um rollback so da imagem (`JARVIS_VERSION=<1.0.x>`) nao basta: o `compose.yml` atualizado continua injetando a URL do `postgres` local. Para voltar ao Neon e preciso reverter tambem o `compose.yml` e o `server/.env`.
+
 ## Operacao
 
 ```bash
@@ -140,4 +221,4 @@ docker compose logs -f server
 docker compose down
 ```
 
-Nao use `docker compose down -v` em producao: ele removeria o volume do banco do Jarvis.
+Nao use `docker compose down -v` em producao: ele removeria os volumes do banco do Jarvis (`postgres-data`) e do Securo (`securo-pgdata`).
