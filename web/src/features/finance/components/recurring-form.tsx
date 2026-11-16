@@ -3,6 +3,7 @@ import { Alert } from '../../../components/ui/alert';
 import { Button } from '../../../components/ui/button';
 import { Modal, ModalActions } from '../../../components/ui/modal';
 import { Segmented } from '../../../components/ui/segmented';
+import { todayISO } from '../../../lib/dates';
 import { createMyRecurring } from '../../../services/finance.service';
 import type { FinanceCategory, TransactionType } from '../../../types/api';
 import { FREQUENCY_OPTIONS } from '../frequency';
@@ -42,6 +43,7 @@ export function RecurringForm({
         amount: parsed,
         type,
         frequency,
+        startDate: todayISO(),
         dayOfMonth:
           frequency === 'monthly' && dayOfMonth ? Number(dayOfMonth) : undefined,
         categoryId: categoryId || undefined,

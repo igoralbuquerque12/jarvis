@@ -41,8 +41,8 @@ export function TransactionForm({
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [date, setDate] = useState(initial?.date ?? todayISO());
-  const [categoryId, setCategoryId] = useState(initial?.category?.id ?? '');
-  const [accountId, setAccountId] = useState(initial?.account?.id ?? '');
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
+  const [accountId, setAccountId] = useState(initial?.accountId ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [showNotes, setShowNotes] = useState(Boolean(initial?.notes));
   const [saving, setSaving] = useState(false);
