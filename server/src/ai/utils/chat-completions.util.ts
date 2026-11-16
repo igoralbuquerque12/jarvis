@@ -1,5 +1,6 @@
 import type { ZodType } from 'zod';
 import { AiProviderError } from '../errors/ai-provider.error';
+import { postToProvider } from './provider-http.util';
 
 export type ChatCompletionRequest = {
   provider: string;
@@ -13,45 +14,17 @@ type ChatCompletionResponse = {
   choices?: { message?: { content?: string | null } }[];
 };
 
-const RETRYABLE_STATUSES = new Set([408, 409, 425, 429]);
-
 /**
  * Calls an OpenAI-compatible `/chat/completions` endpoint and returns the
- * assistant message content. Every failure is mapped to `AiProviderError`
- * with `retryable` set, so callers never see vendor-specific errors.
+ * assistant message content. Failures surface as `AiProviderError`.
  */
 export async function requestChatCompletion(
   request: ChatCompletionRequest,
 ): Promise<string> {
-  const url = `${request.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-
-  let response: Response;
-
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${request.apiKey}`,
-      },
-      body: JSON.stringify(request.body),
-      signal: AbortSignal.timeout(request.timeoutMs),
-    });
-  } catch (error) {
-    // Network failures and timeouts are transient.
-    throw new AiProviderError(
-      `${request.provider} request failed: ${(error as Error).message}`,
-      true,
-      undefined,
-      { cause: error },
-    );
-  }
-
-  if (!response.ok) {
-    throw await toProviderError(request.provider, response);
-  }
-
-  const payload = (await response.json()) as ChatCompletionResponse;
+  const payload = await postToProvider<ChatCompletionResponse>({
+    ...request,
+    path: '/chat/completions',
+  });
   const content = payload.choices?.[0]?.message?.content;
 
   if (!content) {
@@ -96,51 +69,4 @@ export function parseExtraction<T>(
   }
 
   return result.data;
-}
-
-async function toProviderError(
-  provider: string,
-  response: Response,
-): Promise<AiProviderError> {
-  const detail = await readDetail(response);
-  const retryable =
-    response.status >= 500 || RETRYABLE_STATUSES.has(response.status);
-
-  return new AiProviderError(
-    `${provider} request failed: ${response.status} ${response.statusText}${
-      detail ? ` (${detail})` : ''
-    }`,
-    retryable,
-    parseRetryAfter(response.headers.get('retry-after')),
-  );
-}
-
-async function readDetail(response: Response): Promise<string | undefined> {
-  try {
-    const payload = (await response.json()) as {
-      error?: { message?: string } | string;
-    };
-
-    return typeof payload.error === 'string'
-      ? payload.error
-      : payload.error?.message;
-  } catch {
-    return undefined;
-  }
-}
-
-function parseRetryAfter(value: string | null): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const seconds = Number(value);
-
-  if (Number.isFinite(seconds)) {
-    return Math.max(0, seconds * 1000);
-  }
-
-  const date = Date.parse(value);
-
-  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
 }
