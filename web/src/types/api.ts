@@ -267,10 +267,16 @@ export interface UpdateHealthCheckConfigPayload {
 
 // ── Database information (knowledge) ─────────────────────────────────────────
 
+/** RAG indexing of a base: searchable by the assistant only when READY. */
+export type KnowledgeIndexStatus = 'PENDING' | 'PROCESSING' | 'READY' | 'FAILED';
+
 export interface DatabaseInformation {
   id: string;
   name: string;
   content: string;
+  indexStatus: KnowledgeIndexStatus;
+  indexedAt: string | null;
+  chunkCount: number;
   createdAt: string;
   updatedAt: string;
 }
