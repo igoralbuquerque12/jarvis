@@ -17,6 +17,7 @@ import { CreateGoalDto } from '../dto/create-goal.dto';
 import { FindGoalsDto } from '../dto/find-goals.dto';
 import { UpdateGoalDto } from '../dto/update-goal.dto';
 import { GoalsService } from '../services/goals.service';
+import { toGoalView } from '../entities/goal.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -32,13 +33,14 @@ export class GoalsController {
   @Get()
   async findMyGoals(@Req() request: Request, @Query() filters: FindGoalsDto) {
     const profile = await this.requireProfile(request);
-    return this.goalsService.findGoals(profile.id, filters);
+    const goals = await this.goalsService.findGoals(profile.id, filters);
+    return goals.map(toGoalView);
   }
 
   @Post()
   async createMyGoal(@Req() request: Request, @Body() data: CreateGoalDto) {
     const profile = await this.requireProfile(request);
-    return this.goalsService.createGoal(profile.id, data);
+    return toGoalView(await this.goalsService.createGoal(profile.id, data));
   }
 
   @Patch(':goalId')
@@ -48,7 +50,9 @@ export class GoalsController {
     @Body() data: UpdateGoalDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.goalsService.updateGoal(profile.id, goalId, data);
+    return toGoalView(
+      await this.goalsService.updateGoal(profile.id, goalId, data),
+    );
   }
 
   @Delete(':goalId')

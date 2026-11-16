@@ -5,6 +5,7 @@ import { SecuroContextService } from '../../core/services/securo-context.service
 import { CreateGoalDto } from '../dto/create-goal.dto';
 import { FindGoalsDto } from '../dto/find-goals.dto';
 import { UpdateGoalDto } from '../dto/update-goal.dto';
+import { SecuroGoal } from '../entities/goal.view';
 
 @Injectable()
 export class GoalsService {
@@ -16,7 +17,7 @@ export class GoalsService {
   async findGoals(profileId: string, filters: FindGoalsDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroGoal[]>({
       method: 'GET',
       path: '/api/goals',
       ...this.securoContext.auth(context),
@@ -27,7 +28,7 @@ export class GoalsService {
   async createGoal(profileId: string, data: CreateGoalDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroGoal>({
       method: 'POST',
       path: '/api/goals',
       ...this.securoContext.auth(context),
@@ -47,7 +48,7 @@ export class GoalsService {
   async updateGoal(profileId: string, goalId: string, data: UpdateGoalDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroGoal>({
       method: 'PATCH',
       path: `/api/goals/${goalId}`,
       ...this.securoContext.auth(context),
