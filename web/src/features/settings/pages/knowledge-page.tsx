@@ -8,7 +8,10 @@ import { IconLayers, IconPlus } from '../../../components/ui/icons';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyDatabaseInformation } from '../../../hooks/use-my-database-information';
-import { deleteMyDatabaseInformation } from '../../../services/database-information.service';
+import {
+  deleteMyDatabaseInformation,
+  reindexMyDatabaseInformation,
+} from '../../../services/database-information.service';
 import type { DatabaseInformation } from '../../../types/api';
 import { DatabaseInformationFormModal } from '../components/database-information-form-modal';
 import { DatabaseInformationRow } from '../components/database-information-row';
@@ -46,6 +49,19 @@ export function KnowledgePage() {
     }
   }
 
+  async function handleReindex(item: DatabaseInformation) {
+    setActionError(null);
+    try {
+      handleSaved(await reindexMyDatabaseInformation(item.id));
+    } catch (reindexError) {
+      setActionError(
+        reindexError instanceof Error
+          ? reindexError.message
+          : 'Não foi possível indexar a base de novo.',
+      );
+    }
+  }
+
   let body: React.ReactNode;
 
   if (loading) {
@@ -76,6 +92,7 @@ export function KnowledgePage() {
             item={item}
             onEdit={() => setModal(item)}
             onDelete={() => handleDelete(item)}
+            onReindex={() => handleReindex(item)}
           />
         ))}
       </ul>
@@ -86,7 +103,7 @@ export function KnowledgePage() {
     <div className="api-keys-page">
       <PageHeader
         title="Conhecimento"
-        description="Guarde bases de dados em texto. Ao salvar, o Jarvis lê o conteúdo e dá um nome objetivo para cada uma."
+        description="Guarde bases de dados em texto. Ao salvar, o Jarvis dá um nome objetivo para cada uma e indexa o conteúdo para achar a resposta certa quando você perguntar no WhatsApp."
         actions={
           <Button onClick={() => setModal('new')} disabled={limitReached}>
             <IconPlus />
@@ -98,7 +115,7 @@ export function KnowledgePage() {
       <Card>
         <CardHeader
           title="Suas bases de dados"
-          subtitle="Editar o conteúdo faz o Jarvis analisar a base de novo."
+          subtitle="Editar o conteúdo faz o Jarvis analisar e indexar a base de novo. Excluir uma base apaga também tudo o que foi indexado dela."
           aside={
             <Badge variant="neutral">
               {items.length}/{MAX_BASES}
