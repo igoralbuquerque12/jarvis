@@ -4,6 +4,10 @@ import { SecuroContextService } from '../../core/services/securo-context.service
 import { CreateTransactionDto } from '../dto/create-transaction.dto';
 import { FindTransactionsDto } from '../dto/find-transactions.dto';
 import { UpdateTransactionDto } from '../dto/update-transaction.dto';
+import {
+  SecuroTransaction,
+  SecuroTransactionPage,
+} from '../entities/transaction.view';
 
 @Injectable()
 export class TransactionsService {
@@ -15,7 +19,7 @@ export class TransactionsService {
   async createTransaction(profileId: string, data: CreateTransactionDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroTransaction>({
       method: 'POST',
       path: '/api/transactions',
       ...this.securoContext.auth(context),
@@ -35,7 +39,7 @@ export class TransactionsService {
   async findTransactions(profileId: string, filters: FindTransactionsDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroTransactionPage>({
       method: 'GET',
       path: '/api/transactions',
       ...this.securoContext.auth(context),
@@ -59,7 +63,7 @@ export class TransactionsService {
   ) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroTransaction>({
       method: 'PATCH',
       path: `/api/transactions/${transactionId}`,
       ...this.securoContext.auth(context),

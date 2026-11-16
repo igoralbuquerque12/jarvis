@@ -17,6 +17,10 @@ import { CreateTransactionDto } from '../dto/create-transaction.dto';
 import { FindTransactionsDto } from '../dto/find-transactions.dto';
 import { UpdateTransactionDto } from '../dto/update-transaction.dto';
 import { TransactionsService } from '../services/transactions.service';
+import {
+  toTransactionPageView,
+  toTransactionView,
+} from '../entities/transaction.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -35,7 +39,9 @@ export class TransactionsController {
     @Body() data: CreateTransactionDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.transactionsService.createTransaction(profile.id, data);
+    return toTransactionView(
+      await this.transactionsService.createTransaction(profile.id, data),
+    );
   }
 
   @Get()
@@ -44,7 +50,9 @@ export class TransactionsController {
     @Query() filters: FindTransactionsDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.transactionsService.findTransactions(profile.id, filters);
+    return toTransactionPageView(
+      await this.transactionsService.findTransactions(profile.id, filters),
+    );
   }
 
   @Patch(':transactionId')
@@ -54,10 +62,12 @@ export class TransactionsController {
     @Body() data: UpdateTransactionDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.transactionsService.updateTransaction(
-      profile.id,
-      transactionId,
-      data,
+    return toTransactionView(
+      await this.transactionsService.updateTransaction(
+        profile.id,
+        transactionId,
+        data,
+      ),
     );
   }
 
