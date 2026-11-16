@@ -27,7 +27,6 @@ export function TransactionRow({
   const meta = [
     showDate ? formatISODate(tx.date) : null,
     tx.category?.name ?? 'Sem categoria',
-    tx.account && !tx.account.isDefault ? tx.account.name : null,
   ]
     .filter(Boolean)
     .join(' · ');
