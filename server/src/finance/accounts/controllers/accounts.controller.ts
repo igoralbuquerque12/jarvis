@@ -4,6 +4,7 @@ import { BetterAuthService } from '../../../auth/services/better-auth.service';
 import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { AccountsService } from '../services/accounts.service';
+import { toAccountView } from '../entities/account.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -19,7 +20,9 @@ export class AccountsController {
   @Get()
   async findMyAccounts(@Req() request: Request) {
     const profile = await this.requireProfile(request);
-    return this.accountsService.findAccounts(profile.id);
+    const { accounts, defaultAccountId } =
+      await this.accountsService.findAccountsWithDefault(profile.id);
+    return accounts.map((account) => toAccountView(account, defaultAccountId));
   }
 
   @Post()
@@ -28,7 +31,9 @@ export class AccountsController {
     @Body() data: CreateAccountDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.accountsService.createAccount(profile.id, data);
+    return toAccountView(
+      await this.accountsService.createAccount(profile.id, data),
+    );
   }
 
   private async requireProfile(request: Request) {
