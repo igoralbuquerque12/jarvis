@@ -83,12 +83,11 @@ export interface FinanceAccount {
   name: string;
   type: string;
   currency: string;
+  /** Current balance (opening balance plus every transaction). */
   balance: number;
   institution?: string;
-  color?: string;
   icon?: string;
   isDefault: boolean;
-  createdAt: string;
 }
 
 export type TransactionType = 'debit' | 'credit';
@@ -109,9 +108,9 @@ export interface Transaction {
   date: string;
   notes?: string;
   currency: string;
+  accountId?: string;
+  categoryId?: string;
   category?: FinanceCategory;
-  account?: FinanceAccount;
-  createdAt: string;
 }
 
 export interface TransactionSummary {
@@ -132,10 +131,10 @@ export interface Rule {
   id: string;
   name: string;
   priority: number;
+  conditionsOp: string;
   conditions: RuleCondition[];
   actions: RuleAction[];
   isActive: boolean;
-  createdAt: string;
 }
 
 export interface RuleCondition {
@@ -159,6 +158,8 @@ export interface Goal {
   targetDate?: string;
   icon?: string;
   color?: string;
+  status: string;
+  percentage: number;
   createdAt: string;
 }
 
@@ -171,13 +172,13 @@ export interface RecurringTransaction {
   type: TransactionType;
   frequency: RecurringFrequency;
   dayOfMonth?: number;
-  dayOfWeek?: number;
   currency: string;
-  category?: FinanceCategory;
-  account?: FinanceAccount;
-  nextDueDate?: string;
+  startDate: string;
+  endDate?: string;
+  nextDueDate: string;
   isActive: boolean;
-  createdAt: string;
+  accountId?: string;
+  categoryId?: string;
 }
 
 export type AssetType = 'stock' | 'crypto' | 'real_estate' | 'fixed_income' | 'other';
@@ -195,19 +196,19 @@ export interface Asset {
   averagePrice?: number;
   totalCost?: number;
   realizedGain?: number;
-  createdAt: string;
 }
 
-export type AssetTradeType = 'buy' | 'sell';
+export type AssetTradeKind = 'buy' | 'sell';
 
 export interface AssetTrade {
   id: string;
   assetId: string;
-  type: AssetTradeType;
-  units: number;
+  kind: AssetTradeKind;
+  quantity: number;
   price: number;
+  fee: number;
   date: string;
-  createdAt: string;
+  notes?: string;
 }
 
 // ── API keys ─────────────────────────────────────────────────────────────────
