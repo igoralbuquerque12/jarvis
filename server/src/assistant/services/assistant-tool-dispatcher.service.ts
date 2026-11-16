@@ -42,6 +42,6 @@ export class AssistantToolDispatcherService {
 
     return this.assistantToolRegistry
       .get(tool)
-      .execute(profile.id, operation, data);
+      .execute(profile.id, operation, data, { runId });
   }
 }
