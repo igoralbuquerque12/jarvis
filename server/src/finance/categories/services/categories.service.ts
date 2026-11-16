@@ -3,6 +3,7 @@ import { SecuroApiService } from '../../core/services/securo-api.service';
 import { SecuroContextService } from '../../core/services/securo-context.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
+import { SecuroCategory } from '../entities/category.view';
 
 @Injectable()
 export class CategoriesService {
@@ -14,7 +15,7 @@ export class CategoriesService {
   async findCategories(profileId: string) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroCategory[]>({
       method: 'GET',
       path: '/api/categories',
       ...this.securoContext.auth(context),
@@ -24,7 +25,7 @@ export class CategoriesService {
   async createCategory(profileId: string, data: CreateCategoryDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroCategory>({
       method: 'POST',
       path: '/api/categories',
       ...this.securoContext.auth(context),
@@ -43,7 +44,7 @@ export class CategoriesService {
   ) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroCategory>({
       method: 'PATCH',
       path: `/api/categories/${categoryId}`,
       ...this.securoContext.auth(context),

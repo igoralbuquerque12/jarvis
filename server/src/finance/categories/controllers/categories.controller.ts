@@ -15,6 +15,7 @@ import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import { CategoriesService } from '../services/categories.service';
+import { toCategoryView } from '../entities/category.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -30,7 +31,8 @@ export class CategoriesController {
   @Get()
   async findMyCategories(@Req() request: Request) {
     const profile = await this.requireProfile(request);
-    return this.categoriesService.findCategories(profile.id);
+    const categories = await this.categoriesService.findCategories(profile.id);
+    return categories.map(toCategoryView);
   }
 
   @Post()
@@ -39,7 +41,9 @@ export class CategoriesController {
     @Body() data: CreateCategoryDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.categoriesService.createCategory(profile.id, data);
+    return toCategoryView(
+      await this.categoriesService.createCategory(profile.id, data),
+    );
   }
 
   @Patch(':categoryId')
@@ -49,7 +53,9 @@ export class CategoriesController {
     @Body() data: UpdateCategoryDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.categoriesService.updateCategory(profile.id, categoryId, data);
+    return toCategoryView(
+      await this.categoriesService.updateCategory(profile.id, categoryId, data),
+    );
   }
 
   @Delete(':categoryId')
