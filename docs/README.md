@@ -98,7 +98,7 @@ O projeto é um monorepo com backend NestJS, frontend React, um workflow n8n ver
 | **Web app** | React 19 + Vite. Login, dashboard, finanças, perfil, planos, chaves de API e documentação da API. |
 | **n8n + LLM** | Orquestra o agente: valida o payload, monta o prompt, roda o modelo com function calling e devolve uma resposta em texto. |
 | **Securo** | Motor financeiro invisível para o usuário. FastAPI + Postgres + Celery, rodando na rede interna. |
-| **PostgreSQL + pgvector** | Banco do Jarvis (serviço `postgres` do compose): usuários, perfis, mensagens, eventos, chaves, credenciais do WhatsApp e os trechos indexados das bases de conhecimento. Backup diário pelo serviço `postgres-backup`. |
+| **PostgreSQL + pgvector** | Banco do Jarvis (serviço `postgres` do compose): usuários, perfis, mensagens, eventos, chaves, credenciais do WhatsApp e os trechos indexados das bases de conhecimento. Sem backup automático. |
 | **Redis** | Cache do scheduler de eventos e dos tokens do Securo. Também é o broker do Celery do Securo (database 1). |
 | **Sistemas externos** | Qualquer script do usuário autenticado com uma chave `jrv_…` na API pública. |
 
@@ -128,7 +128,7 @@ Pontos que valem destaque:
 - **Ordem de subida garantida pelo compose**: o `server` só sobe depois que `migrate` (Prisma) terminou com código 0, `redis` está saudável e `securo-backend` iniciou; o Securo, por sua vez, espera suas próprias migrations Alembic.
 - **O n8n é um container à parte**, conectado à rede `jarvis-internal` uma única vez (`docker network connect`). Ele chama o backend por `http://server:3000` e o backend o chama por `http://n8n:5678`. A configuração do n8n é feita por túnel SSH, sem expor a porta.
 - **Um Redis, dois usos**: database 0 para o Jarvis, database 1 para o Securo. Persistência AOF em volume.
-- **Os bancos são locais, em volume Docker**: o do Jarvis no serviço `postgres` (com backup diário) e o do Securo no `securo-db`.
+- **Os bancos são locais, em volume Docker**: o do Jarvis no serviço `postgres` e o do Securo no `securo-db`.
 
 ### Modelo de dados
 

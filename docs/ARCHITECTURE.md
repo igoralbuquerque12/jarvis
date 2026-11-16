@@ -80,7 +80,6 @@ As fronteiras importantes:
 | Serviço (`compose.yml`) | Imagem / build | Função | Depende de |
 |---|---|---|---|
 | `postgres` | `pgvector/pgvector:pg16` | Postgres do Jarvis (database e usuário `jarvis`, extensão `vector`), volume `postgres-data`. Porta só em `127.0.0.1:5432`. | — |
-| `postgres-backup` | `pgvector/pgvector:pg16` | `infra/postgres/backup.sh`: `pg_dump` diário (7 diários + 4 semanais) no volume `postgres-backups`. | `postgres` (healthy) |
 | `migrate` | `server/Dockerfile` (target `builder`) | `npx prisma migrate deploy` e termina. | `postgres` (healthy) |
 | `server` | `server/Dockerfile` (target `production`) | API NestJS, socket WhatsApp, scheduler. | `migrate` (exit 0), `postgres` (healthy), `redis` (healthy), `securo-backend` (started) |
 | `web` | `web/Dockerfile` | nginx servindo o build estático do Vite. | `server` |
@@ -658,9 +657,9 @@ Dez migrations versionadas em `server/prisma/migrations`, aplicadas por `prisma 
 
 Cliente `redis` v6, conectado no `onModuleInit` e fechado com `quit` no destroy. Módulo `@Global()` porque três módulos distintos o consomem (events, finance, e potencialmente outros). O compose liga `--appendonly yes`; o cache é descartável, mas o Securo usa o mesmo Redis como broker do Celery e como rate limiter de login, e aí a durabilidade importa.
 
-### 14.2.1 Postgres local e backup
+### 14.2.1 Postgres local
 
-O Postgres do Jarvis roda na própria VPS (serviço `postgres`, imagem com pgvector, porque as bases de conhecimento guardam embeddings). A `DATABASE_URL` de `server` e `migrate` é montada pelo compose a partir de `JARVIS_DB_PASSWORD` (`.env` da raiz) e sobrescreve a do `server/.env`, que só vale para o dev local. Sem banco gerenciado, o backup é nosso: o `postgres-backup` grava um `pg_dump` por dia no volume `postgres-backups` (7 diários, 4 semanais). A cópia para fora da VPS ainda não está configurada; até lá, perder o disco perde os dados, inclusive a sessão do WhatsApp. O procedimento de restauração está em `docs/DEPLOYMENT.md`.
+O Postgres do Jarvis roda na própria VPS (serviço `postgres`, imagem com pgvector, porque as bases de conhecimento guardam embeddings). A `DATABASE_URL` de `server` e `migrate` é montada pelo compose a partir de `JARVIS_DB_PASSWORD` (`.env` da raiz) e sobrescreve a do `server/.env`, que só vale para o dev local. Sem banco gerenciado, não há backup automático: perder o disco da VPS perde os dados, inclusive a sessão do WhatsApp. Dump e restauração manuais estão em `docs/DEPLOYMENT.md`.
 
 ### 14.3 Configuração
 

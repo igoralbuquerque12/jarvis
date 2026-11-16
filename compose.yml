@@ -113,28 +113,6 @@ services:
     networks:
       - jarvis-internal
 
-  # Daily pg_dump of the Jarvis database into the `postgres-backups` volume
-  # (7 daily + 4 weekly copies). See infra/postgres/backup.sh.
-  postgres-backup:
-    container_name: jarvis-postgres-backup
-    image: pgvector/pgvector:pg16
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      PGHOST: postgres
-      PGUSER: jarvis
-      PGPASSWORD: ${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}
-      PGDATABASE: jarvis
-      BACKUP_DIR: /backups
-    entrypoint: ["sh", "/scripts/backup.sh"]
-    volumes:
-      - ./infra/postgres/backup.sh:/scripts/backup.sh:ro
-      - postgres-backups:/backups
-    networks:
-      - jarvis-internal
-
   securo-db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -232,7 +210,6 @@ networks:
 
 volumes:
   postgres-data:
-  postgres-backups:
   redis-data:
   securo-pgdata:
   securo-attachments:
