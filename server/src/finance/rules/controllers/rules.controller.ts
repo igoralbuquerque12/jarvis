@@ -15,6 +15,7 @@ import { ProfileService } from '../../../profile/services/profile.service';
 import { CreateRuleDto } from '../dto/create-rule.dto';
 import { UpdateRuleDto } from '../dto/update-rule.dto';
 import { RulesService } from '../services/rules.service';
+import { toRuleView } from '../entities/rule.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -30,13 +31,14 @@ export class RulesController {
   @Get()
   async findMyRules(@Req() request: Request) {
     const profile = await this.requireProfile(request);
-    return this.rulesService.findRules(profile.id);
+    const rules = await this.rulesService.findRules(profile.id);
+    return rules.map(toRuleView);
   }
 
   @Post()
   async createMyRule(@Req() request: Request, @Body() data: CreateRuleDto) {
     const profile = await this.requireProfile(request);
-    return this.rulesService.createRule(profile.id, data);
+    return toRuleView(await this.rulesService.createRule(profile.id, data));
   }
 
   @Patch(':ruleId')
@@ -46,7 +48,9 @@ export class RulesController {
     @Body() data: UpdateRuleDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.rulesService.updateRule(profile.id, ruleId, data);
+    return toRuleView(
+      await this.rulesService.updateRule(profile.id, ruleId, data),
+    );
   }
 
   @Delete(':ruleId')
