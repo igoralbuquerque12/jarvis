@@ -1,20 +1,22 @@
 import { IconButton } from '../../../components/ui/button';
 import { IconRepeat, IconTrash } from '../../../components/ui/icons';
 import { formatISODate } from '../../../lib/dates';
-import type { RecurringTransaction } from '../../../types/api';
+import type { FinanceCategory, RecurringTransaction } from '../../../types/api';
 import { FREQUENCY_LABELS } from '../frequency';
 import { Amount } from './amount';
 
 interface RecurringRowProps {
   item: RecurringTransaction;
+  /** Securo only returns `categoryId`; the parent resolves it. */
+  category?: FinanceCategory;
   onDelete?: (id: string) => void;
 }
 
-export function RecurringRow({ item, onDelete }: RecurringRowProps) {
+export function RecurringRow({ item, category, onDelete }: RecurringRowProps) {
   const meta = [
     FREQUENCY_LABELS[item.frequency] ?? item.frequency,
     item.dayOfMonth != null ? `dia ${item.dayOfMonth}` : null,
-    item.category?.name ?? null,
+    category?.name ?? null,
     item.nextDueDate ? `próxima em ${formatISODate(item.nextDueDate)}` : null,
   ]
     .filter(Boolean)
@@ -23,7 +25,7 @@ export function RecurringRow({ item, onDelete }: RecurringRowProps) {
   return (
     <li className="tx-row">
       <span className="tx-row__icon" data-type={item.type} aria-hidden="true">
-        {item.category?.icon ? item.category.icon : <IconRepeat />}
+        {category?.icon ? category.icon : <IconRepeat />}
       </span>
       <div className="tx-row__body">
         <span className="tx-row__description">{item.description}</span>
