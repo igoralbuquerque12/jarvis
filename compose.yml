@@ -6,8 +6,6 @@ x-securo-env: &securo-env
   REDIS_URL: redis://redis:6379/1
   STORAGE_LOCAL_PATH: /app/data/attachments
 
-# Jarvis database (the `postgres` service below). The password comes from the
-# root .env and must be URL-safe (e.g. `openssl rand -hex 24`).
 x-jarvis-database-url: &jarvis-database-url postgresql://jarvis:${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}@postgres:5432/jarvis
 
 services:
@@ -90,8 +88,6 @@ services:
       - jarvis-internal
       - proxy
 
-  # Jarvis' own database (users, profiles, events, knowledge bases and their
-  # pgvector chunks). Securo keeps its separate `securo-db` below.
   postgres:
     container_name: jarvis-postgres
     image: pgvector/pgvector:pg16
@@ -101,7 +97,6 @@ services:
       POSTGRES_PASSWORD: ${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}
       POSTGRES_DB: jarvis
     ports:
-      # Host loopback only: local dev and SSH tunnels, never the internet.
       - "127.0.0.1:${JARVIS_DB_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
