@@ -61,7 +61,7 @@ Números do repositório na data deste documento (10 de setembro de 2026):
 
 <p align="center"><img src="diagrams/01-context.svg" alt="Diagrama de contexto" width="100%"></p>
 
-O sistema tem dois tipos de usuário humano (a pessoa que conversa e a mesma pessoa usando o painel), um tipo de cliente máquina (sistemas do próprio usuário autenticados por API key) e quatro sistemas externos: os servidores do WhatsApp, o provedor de LLM (Groq), o banco gerenciado (Neon) e, num grau intermediário, o Securo e o n8n, que rodam na mesma VPS mas são processos com ciclo de vida próprio.
+O sistema tem dois tipos de usuário humano (a pessoa que conversa e a mesma pessoa usando o painel), um tipo de cliente máquina (sistemas do próprio usuário autenticados por API key) e quatro sistemas externos: os servidores do WhatsApp, o provedor de LLM (Groq, mais a OpenAI para extração e embeddings das bases de conhecimento) e, num grau intermediário, o Securo e o n8n, que rodam na mesma VPS mas são processos com ciclo de vida próprio.
 
 As fronteiras importantes:
 
@@ -79,8 +79,10 @@ As fronteiras importantes:
 
 | Serviço (`compose.yml`) | Imagem / build | Função | Depende de |
 |---|---|---|---|
-| `migrate` | `server/Dockerfile` (target `builder`) | `npx prisma migrate deploy` e termina. | — |
-| `server` | `server/Dockerfile` (target `production`) | API NestJS, socket WhatsApp, scheduler. | `migrate` (exit 0), `redis` (healthy), `securo-backend` (started) |
+| `postgres` | `pgvector/pgvector:pg16` | Postgres do Jarvis (database e usuário `jarvis`, extensão `vector`), volume `postgres-data`. Porta só em `127.0.0.1:5432`. | — |
+| `postgres-backup` | `pgvector/pgvector:pg16` | `infra/postgres/backup.sh`: `pg_dump` diário (7 diários + 4 semanais) no volume `postgres-backups`. | `postgres` (healthy) |
+| `migrate` | `server/Dockerfile` (target `builder`) | `npx prisma migrate deploy` e termina. | `postgres` (healthy) |
+| `server` | `server/Dockerfile` (target `production`) | API NestJS, socket WhatsApp, scheduler. | `migrate` (exit 0), `postgres` (healthy), `redis` (healthy), `securo-backend` (started) |
 | `web` | `web/Dockerfile` | nginx servindo o build estático do Vite. | `server` |
 | `redis` | `redis:7-alpine` | Cache do Jarvis (db 0) e broker/cache do Securo (db 1). AOF ligado. | — |
 | `securo-db` | `pgvector/pgvector:pg16` | Postgres do Securo, volume `securo-pgdata`. | — |
@@ -108,7 +110,7 @@ A ordem é imposta por `depends_on` com condições, não por scripts de espera:
 ```
 securo-db (healthy) ──► securo-migrate (exit 0) ──► securo-backend ──┐
 redis (healthy) ─────────────────────────────────────────────────────┼──► server ──► web
-migrate (exit 0) ────────────────────────────────────────────────────┘
+postgres (healthy) ──► migrate (exit 0) ─────────────────────────────┘
 ```
 
 As migrations do Jarvis rodam num container separado (`migrate`) que usa o **mesmo build** do server (target `builder`, que tem o Prisma CLI e as devDependencies). O container de produção não carrega o CLI: ele copia apenas `dist/`, o client gerado (`node_modules/.prisma` e `@prisma`) e as dependências de runtime, e roda como usuário `node`.
@@ -630,6 +632,9 @@ TLS terminado no Traefik. CORS aceita exatamente `WEB_ORIGIN` com `credentials: 
 | `securo_accounts` | Jarvis | 1:1 com o perfil. Guarda ids do Securo e estado do provisioning. |
 | `api_keys` | Jarvis | `hash unique`, índice em `profileId`. |
 | `whatsapp_auth` | Jarvis | Key-value cifrado da sessão Baileys. Uma sessão por instalação. |
+| `database_informations` | Jarvis | Bases de conhecimento em texto (`content` jsonb). Estado da indexação RAG: `indexStatus` (`PENDING → PROCESSING → READY \| FAILED`), `contentHash`, `indexAttempts`, `indexError`, `indexedAt`, `chunkCount`. |
+| `knowledge_chunks` | Jarvis | Trechos das bases com `embedding vector(1536)` (pgvector, coluna `Unsupported` no Prisma, escrita e lida por SQL cru) e `embeddingModel`. FKs com `onDelete: Cascade` para a base e o perfil: excluir a base apaga os trechos na mesma transação. Sem índice HNSW de propósito (a busca é sempre de um perfil, exata). |
+| `knowledge_search_logs` | Jarvis | Cada `search_knowledge`: consulta, `runId`, ids e scores retornados. Serve para calibrar o limiar de similaridade. |
 
 ### 13.2 Migrations
 
@@ -647,11 +652,15 @@ Dez migrations versionadas em `server/prisma/migrations`, aplicadas por `prisma 
 
 ### 14.1 Prisma 7 com driver adapter
 
-`PrismaService` estende `PrismaClient` e passa `new PrismaPg({ connectionString })` como `adapter`. O Neon expõe um *pooler* (PgBouncer em modo transação) que não é compatível com o protocolo do engine padrão do Prisma; o driver adapter sobre `pg` resolve isso e também funciona com qualquer Postgres local. `$connect` no `onModuleInit`, `$disconnect` no `onModuleDestroy`.
+`PrismaService` estende `PrismaClient` e passa `new PrismaPg({ connectionString })` como `adapter`. O adapter nasceu para o *pooler* do Neon (banco usado até a versão 1.0.x); desde a 1.1.0 o banco é o serviço `postgres` do compose e o adapter continua, sem custo, porque funciona com qualquer Postgres. `$connect` no `onModuleInit`, `$disconnect` no `onModuleDestroy`.
 
 ### 14.2 Redis
 
 Cliente `redis` v6, conectado no `onModuleInit` e fechado com `quit` no destroy. Módulo `@Global()` porque três módulos distintos o consomem (events, finance, e potencialmente outros). O compose liga `--appendonly yes`; o cache é descartável, mas o Securo usa o mesmo Redis como broker do Celery e como rate limiter de login, e aí a durabilidade importa.
+
+### 14.2.1 Postgres local e backup
+
+O Postgres do Jarvis roda na própria VPS (serviço `postgres`, imagem com pgvector, porque as bases de conhecimento guardam embeddings). A `DATABASE_URL` de `server` e `migrate` é montada pelo compose a partir de `JARVIS_DB_PASSWORD` (`.env` da raiz) e sobrescreve a do `server/.env`, que só vale para o dev local. Sem banco gerenciado, o backup é nosso: o `postgres-backup` grava um `pg_dump` por dia no volume `postgres-backups` (7 diários, 4 semanais). A cópia para fora da VPS ainda não está configurada; até lá, perder o disco perde os dados, inclusive a sessão do WhatsApp. O procedimento de restauração está em `docs/DEPLOYMENT.md`.
 
 ### 14.3 Configuração
 

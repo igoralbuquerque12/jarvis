@@ -6,14 +6,23 @@ x-securo-env: &securo-env
   REDIS_URL: redis://redis:6379/1
   STORAGE_LOCAL_PATH: /app/data/attachments
 
+# Jarvis database (the `postgres` service below). The password comes from the
+# root .env and must be URL-safe (e.g. `openssl rand -hex 24`).
+x-jarvis-database-url: &jarvis-database-url postgresql://jarvis:${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}@postgres:5432/jarvis
+
 services:
   migrate:
     image: ${JARVIS_IMAGE_NAMESPACE:-jarvis}/jarvis-migrate:${JARVIS_VERSION:-local}
     build:
       context: ./server
       target: builder
+    depends_on:
+      postgres:
+        condition: service_healthy
     env_file:
       - ./server/.env
+    environment:
+      DATABASE_URL: *jarvis-database-url
     command: npx prisma migrate deploy
     networks:
       - jarvis-internal
@@ -29,6 +38,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       securo-backend:
@@ -38,6 +49,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
+      DATABASE_URL: *jarvis-database-url
       REDIS_URL: redis://redis:6379
       SECURO_API_URL: http://securo-backend:8000
       WEB_ORIGIN: https://${FRONTEND_DOMAIN}
@@ -77,6 +89,51 @@ services:
     networks:
       - jarvis-internal
       - proxy
+
+  # Jarvis' own database (users, profiles, events, knowledge bases and their
+  # pgvector chunks). Securo keeps its separate `securo-db` below.
+  postgres:
+    container_name: jarvis-postgres
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}
+      POSTGRES_DB: jarvis
+    ports:
+      # Host loopback only: local dev and SSH tunnels, never the internet.
+      - "127.0.0.1:${JARVIS_DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jarvis-internal
+
+  # Daily pg_dump of the Jarvis database into the `postgres-backups` volume
+  # (7 daily + 4 weekly copies). See infra/postgres/backup.sh.
+  postgres-backup:
+    container_name: jarvis-postgres-backup
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: jarvis
+      PGPASSWORD: ${JARVIS_DB_PASSWORD:?set JARVIS_DB_PASSWORD in the root .env}
+      PGDATABASE: jarvis
+      BACKUP_DIR: /backups
+    entrypoint: ["sh", "/scripts/backup.sh"]
+    volumes:
+      - ./infra/postgres/backup.sh:/scripts/backup.sh:ro
+      - postgres-backups:/backups
+    networks:
+      - jarvis-internal
 
   securo-db:
     image: pgvector/pgvector:pg16
@@ -174,6 +231,8 @@ networks:
     name: proxy
 
 volumes:
+  postgres-data:
+  postgres-backups:
   redis-data:
   securo-pgdata:
   securo-attachments:
