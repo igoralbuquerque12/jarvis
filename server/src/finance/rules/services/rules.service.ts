@@ -3,6 +3,7 @@ import { SecuroApiService } from '../../core/services/securo-api.service';
 import { SecuroContextService } from '../../core/services/securo-context.service';
 import { CreateRuleDto } from '../dto/create-rule.dto';
 import { UpdateRuleDto } from '../dto/update-rule.dto';
+import { SecuroRule } from '../entities/rule.view';
 
 @Injectable()
 export class RulesService {
@@ -14,7 +15,7 @@ export class RulesService {
   async findRules(profileId: string) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroRule[]>({
       method: 'GET',
       path: '/api/rules',
       ...this.securoContext.auth(context),
@@ -24,7 +25,7 @@ export class RulesService {
   async createRule(profileId: string, data: CreateRuleDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroRule>({
       method: 'POST',
       path: '/api/rules',
       ...this.securoContext.auth(context),
@@ -44,7 +45,7 @@ export class RulesService {
   async updateRule(profileId: string, ruleId: string, data: UpdateRuleDto) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroRule>({
       method: 'PATCH',
       path: `/api/rules/${ruleId}`,
       ...this.securoContext.auth(context),

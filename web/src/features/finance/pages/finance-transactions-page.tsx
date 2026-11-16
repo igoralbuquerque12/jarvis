@@ -392,6 +392,9 @@ function RecurringView({
                   <RecurringRow
                     key={item.id}
                     item={item}
+                    category={categories.find(
+                      (category) => category.id === item.categoryId,
+                    )}
                     onDelete={(id) => void handleDelete(id)}
                   />
                 ))}
@@ -413,6 +416,9 @@ function RecurringView({
                   <RecurringRow
                     key={item.id}
                     item={item}
+                    category={categories.find(
+                      (category) => category.id === item.categoryId,
+                    )}
                     onDelete={(id) => void handleDelete(id)}
                   />
                 ))}

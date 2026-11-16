@@ -68,6 +68,7 @@ finance/
     finance-tool.service.ts               # handler da ferramenta `finance` do assistente (@AssistantToolHandlerFor('finance'))
   accounts/ transactions/ categories/ rules/ goals/ recurring-transactions/ assets/
     controllers/                          # /finance/me/... (front, sessão better-auth)
+    entities/*.view.ts                    # resposta crua do Securo -> contrato do web (camelCase, números)
     services/                             # operações de domínio por profileId (traduz DTO -> payload Securo)
     dto/                                  # DTOs class-validator (create/update/find por área)
 ```
@@ -93,6 +94,8 @@ finance/
 - Dinheiro é enviado como **string com 2 casas** (`"50.50"`) para evitar ruído de float — o Securo usa `Numeric(15,2)`.
 - Datas são **`YYYY-MM-DD`** (sem hora, sem timezone).
 - DTOs em camelCase → payload snake_case (`categoryId` → `category_id`); campos não informados são omitidos (PATCH do Securo é `exclude_unset`: omitido = não mexe).
+- **Respostas para o web** (`/finance/me/*`): os controllers passam a resposta do Securo por um `entities/*.view.ts` da área, que converte snake_case → camelCase e todo valor monetário para `number`. O Pydantic do Securo serializa `Decimal` como **string** (`"1200.00"`), e somar strings no front gerava `NaN`/concatenação. Contas expõem `balance` = `current_balance` (saldo com as transações) e `isDefault` (é a "Carteira" do perfil). Transações trazem `accountId`/`categoryId` e a `category` aninhada; recorrências só trazem `categoryId` (o front resolve o nome). Conversão numérica em `core/utils/securo-value.util.ts`.
+- **A ferramenta `finance` (n8n) continua recebendo o JSON cru do Securo**, sem a view — o formato que o modelo vê não mudou.
 - `accountId` omitido em transações/recorrências → usa a **"Carteira"** padrão do perfil.
 - Moeda default **BRL** em contas, metas, recorrências e ativos; em transações a moeda default é a da conta.
 
@@ -115,7 +118,7 @@ Acesso por plano: os controllers `/finance/me/*` têm `@RequiresPlan(PLAN_FEATUR
 | Recorrências (salário) | `GET/POST .../recurring-transactions`, `PATCH/DELETE .../recurring-transactions/:recurringTransactionId` |
 | Investimentos | `GET/POST .../assets`, `POST .../assets/:assetId/values`, `GET/POST .../assets/:assetId/trades`, `DELETE .../assets/:assetId` |
 
-O `GET .../transactions` aceita `from`, `to`, `type`, `categoryId`, `accountId`, `q`, `page`, `limit` e devolve o envelope do Securo `{ items, total, page, limit, summary }` — o `summary` traz `income`, `expense` e `net` de todo o período filtrado (perfeito para "quanto gastei esse mês").
+O `GET .../transactions` aceita `from`, `to`, `type`, `categoryId`, `accountId`, `q`, `page`, `limit` e devolve o envelope `{ items, total, page, limit, summary }` (para o web, já mapeado pela view; `summary` zerado quando o Securo não manda) — o `summary` traz `income`, `expense` e `net` de todo o período filtrado (perfeito para "quanto gastei esse mês").
 
 ### 5. Tools do assistente (`assistant/tools/finance.tools.ts`)
 
@@ -152,6 +155,7 @@ E opcionalmente, na raiz (interpolação do compose): `SECURO_SECRET_KEY=<segred
 ### 7. Testes
 
 - `finance.service.spec.ts` — mapeamento de payloads (conta padrão, dinheiro como string, snake_case, PATCH só com campos enviados, defaults BRL).
+- `securo-views.spec.ts` — views do web: Decimal-string → number, snake → camel, conta padrão, `summary` ausente.
 - `securo-provisioning.service.spec.ts` — curto-circuito de conta ACTIVE, fluxo completo de provisioning, marcação de FAILED, cache de token.
 - `main.tools.spec.ts` — catálogo completo das operações financeiras na tool RPC `finance`.
 - `finance-tool.service.spec.ts` — roteamento das operações para os services, id separado do resto de `data`, operação desconhecida.

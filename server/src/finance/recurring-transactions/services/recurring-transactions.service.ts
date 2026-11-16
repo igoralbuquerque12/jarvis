@@ -4,6 +4,7 @@ import { SecuroApiService } from '../../core/services/securo-api.service';
 import { SecuroContextService } from '../../core/services/securo-context.service';
 import { CreateRecurringTransactionDto } from '../dto/create-recurring-transaction.dto';
 import { UpdateRecurringTransactionDto } from '../dto/update-recurring-transaction.dto';
+import { SecuroRecurringTransaction } from '../entities/recurring-transaction.view';
 
 @Injectable()
 export class RecurringTransactionsService {
@@ -15,7 +16,7 @@ export class RecurringTransactionsService {
   async findRecurringTransactions(profileId: string) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroRecurringTransaction[]>({
       method: 'GET',
       path: '/api/recurring-transactions',
       ...this.securoContext.auth(context),
@@ -28,7 +29,7 @@ export class RecurringTransactionsService {
   ) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroRecurringTransaction>({
       method: 'POST',
       path: '/api/recurring-transactions',
       ...this.securoContext.auth(context),
@@ -54,7 +55,7 @@ export class RecurringTransactionsService {
   ) {
     const context = await this.securoContext.contextFor(profileId);
 
-    return this.securoApi.request({
+    return this.securoApi.request<SecuroRecurringTransaction>({
       method: 'PATCH',
       path: `/api/recurring-transactions/${recurringTransactionId}`,
       ...this.securoContext.auth(context),

@@ -15,6 +15,11 @@ import { CreateAssetDto } from '../dto/create-asset.dto';
 import { CreateAssetTradeDto } from '../dto/create-asset-trade.dto';
 import { CreateAssetValueDto } from '../dto/create-asset-value.dto';
 import { AssetsService } from '../services/assets.service';
+import {
+  toAssetTradeView,
+  toAssetValueView,
+  toAssetView,
+} from '../entities/asset.view';
 import { PLAN_FEATURE_MIN_PLAN } from '../../../subscription/constants/subscription-plans.constant';
 import { RequiresPlan } from '../../../subscription/decorators/requires-plan.decorator';
 
@@ -30,13 +35,14 @@ export class AssetsController {
   @Get()
   async findMyAssets(@Req() request: Request) {
     const profile = await this.requireProfile(request);
-    return this.assetsService.findAssets(profile.id);
+    const assets = await this.assetsService.findAssets(profile.id);
+    return assets.map(toAssetView);
   }
 
   @Post()
   async createMyAsset(@Req() request: Request, @Body() data: CreateAssetDto) {
     const profile = await this.requireProfile(request);
-    return this.assetsService.createAsset(profile.id, data);
+    return toAssetView(await this.assetsService.createAsset(profile.id, data));
   }
 
   @Post(':assetId/values')
@@ -46,7 +52,9 @@ export class AssetsController {
     @Body() data: CreateAssetValueDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.assetsService.addAssetValue(profile.id, assetId, data);
+    return toAssetValueView(
+      await this.assetsService.addAssetValue(profile.id, assetId, data),
+    );
   }
 
   @Get(':assetId/trades')
@@ -55,7 +63,11 @@ export class AssetsController {
     @Param('assetId', ParseUUIDPipe) assetId: string,
   ) {
     const profile = await this.requireProfile(request);
-    return this.assetsService.findAssetTrades(profile.id, assetId);
+    const trades = await this.assetsService.findAssetTrades(
+      profile.id,
+      assetId,
+    );
+    return trades.map(toAssetTradeView);
   }
 
   @Post(':assetId/trades')
@@ -65,7 +77,9 @@ export class AssetsController {
     @Body() data: CreateAssetTradeDto,
   ) {
     const profile = await this.requireProfile(request);
-    return this.assetsService.createAssetTrade(profile.id, assetId, data);
+    return toAssetView(
+      await this.assetsService.createAssetTrade(profile.id, assetId, data),
+    );
   }
 
   @Delete(':assetId')
