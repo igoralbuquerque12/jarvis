@@ -48,8 +48,9 @@ describe('ASSISTANT_TOOLS', () => {
     ]);
   });
 
-  it('publishes the knowledge read operation in the database_information tool', () => {
+  it('publishes the RAG search first and the whole-base read second in the database_information tool', () => {
     expect(operationNames('database_information')).toEqual([
+      'search_knowledge',
       'get_database_information',
     ]);
   });
