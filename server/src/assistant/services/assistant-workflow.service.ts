@@ -36,9 +36,6 @@ export class AssistantWorkflowService {
       );
     }
 
-    console.log('Response from workflow:', response);
-    console.log('Response from workflow:', JSON.stringify(response));
-
     const data: unknown = await response.json();
     return ReceiveMessageWorkflowOutputSchema.parse(data);
   }
