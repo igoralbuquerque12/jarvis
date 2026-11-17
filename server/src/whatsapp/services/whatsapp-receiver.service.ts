@@ -19,7 +19,6 @@ export class WhatsappReceiverService {
     }
 
     for (const message of messages) {
-      console.log('Received message:', message);
       const from = message.key.remoteJid;
       const messageId = message.key.id;
 

@@ -1,5 +1,5 @@
 import express from 'express';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { BetterAuthService } from './auth/services/better-auth.service';
@@ -7,9 +7,17 @@ import { toNodeHandler } from 'better-auth/node';
 
 const logger = new Logger('Bootstrap');
 
+function useJsonLogs(): boolean {
+  const format = process.env.LOG_FORMAT?.trim().toLowerCase();
+  if (format === 'json') return true;
+  if (format === 'pretty') return false;
+  return !process.stdout.isTTY;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
+    logger: new ConsoleLogger({ json: useJsonLogs() }),
   });
 
   const webOrigin = process.env.WEB_ORIGIN?.trim() || 'http://localhost:5173';
