@@ -1,6 +1,12 @@
 name: CI/CD
 
-# Every push to main: test -> build + push images to Docker Hub -> deploy over SSH.
+# Every push to main runs one job per stage:
+#
+#   test -> version -> build -> deploy -> health -> status -> notify
+#
+# `status` runs whenever the deploy started (even after a rollback) and `notify`
+# always runs, so a failure still shows what is up and reaches WhatsApp.
+#
 # Images are tagged <VERSION>-<short sha> (e.g. 1.4.2-a3f9c1b); there is no `latest`.
 # The deploy only replaces the app containers (migrate, server, web); Redis,
 # Securo and Traefik keep running untouched.
@@ -23,8 +29,9 @@ env:
   IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
 jobs:
+  # 1. Tests: if anything fails here, nothing is published or deployed.
   test:
-    name: Test (server)
+    name: Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,26 +49,16 @@ jobs:
       - run: npx prisma generate
       - run: npm test
 
-  build:
-    name: Build & push images
+  # 2. Image version: <VERSION>-<short sha>; refuses a VERSION that is not SemVer.
+  version:
+    name: Image version
     needs: test
-    # The VPS is ARM64: build natively on an ARM runner (free for public repos).
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check required configuration
-        env:
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          API_DOMAIN: ${{ vars.API_DOMAIN }}
-        run: |
-          missing=0
-          [ -n "$IMAGE_NAMESPACE" ] || { echo "::error::Repository variable DOCKERHUB_USERNAME is not set"; missing=1; }
-          [ -n "$DOCKERHUB_TOKEN" ] || { echo "::error::Repository secret DOCKERHUB_TOKEN is not set"; missing=1; }
-          [ -n "$API_DOMAIN" ] || { echo "::error::Repository variable API_DOMAIN is not set (baked into the web build)"; missing=1; }
-          exit $missing
 
       - name: Compute image tag
         id: meta
@@ -75,6 +72,29 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Image tag: \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # 3. Build & push: jarvis-server, jarvis-migrate and jarvis-web to Docker Hub.
+  build:
+    name: Build & push images
+    needs: version
+    # The VPS is ARM64: build natively on an ARM runner (free for public repos).
+    runs-on: ubuntu-24.04-arm
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required configuration
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+        run: |
+          missing=0
+          [ -n "$IMAGE_NAMESPACE" ] || { echo "::error::Repository variable DOCKERHUB_USERNAME is not set"; missing=1; }
+          [ -n "$DOCKERHUB_TOKEN" ] || { echo "::error::Repository secret DOCKERHUB_TOKEN is not set"; missing=1; }
+          [ -n "$API_DOMAIN" ] || { echo "::error::Repository variable API_DOMAIN is not set (baked into the web build)"; missing=1; }
+          exit $missing
 
       - uses: docker/setup-buildx-action@v3
 
@@ -90,11 +110,11 @@ jobs:
           target: production
           platforms: linux/arm64
           push: true
-          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-server:${{ steps.meta.outputs.tag }}
+          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-server:${{ env.TAG }}
           labels: |
             org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.version=${{ env.VERSION }}
           cache-from: type=gha,scope=server
           cache-to: type=gha,mode=max,scope=server
 
@@ -106,11 +126,11 @@ jobs:
           target: builder
           platforms: linux/arm64
           push: true
-          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-migrate:${{ steps.meta.outputs.tag }}
+          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-migrate:${{ env.TAG }}
           labels: |
             org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.version=${{ env.VERSION }}
           cache-from: type=gha,scope=server
 
       - name: Build & push web
@@ -120,25 +140,25 @@ jobs:
           target: production
           platforms: linux/arm64
           push: true
-          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-web:${{ steps.meta.outputs.tag }}
+          tags: ${{ env.IMAGE_NAMESPACE }}/jarvis-web:${{ env.TAG }}
           build-args: |
             VITE_API_URL=https://${{ vars.API_DOMAIN }}
             VITE_WHATSAPP_NUMBER=${{ vars.VITE_WHATSAPP_NUMBER }}
           labels: |
             org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.version=${{ env.VERSION }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
+  # 4. Deploy: pull the new images, run migrations, recreate server and web.
   deploy:
     name: Deploy to VPS
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     env:
-      JARVIS_VERSION: ${{ needs.build.outputs.tag }}
+      JARVIS_VERSION: ${{ needs.version.outputs.tag }}
       JARVIS_IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME }}
-      JARVIS_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
     # One SSH step per stage, so the WhatsApp notification can name the one that
     # failed. The notify job matches these step names: keep them in sync.
     steps:
@@ -189,6 +209,17 @@ jobs:
             cd /home/ubuntu/projects/jarvis
             docker compose up -d --no-deps --no-build server web
 
+  # 5. Health check & rollback: 20 s after the swap the server must be running
+  # with no restarts; otherwise server and web go back to the previous version.
+  health:
+    name: Health check & rollback
+    needs: [version, deploy]
+    runs-on: ubuntu-latest
+    env:
+      JARVIS_VERSION: ${{ needs.version.outputs.tag }}
+      JARVIS_IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME }}
+      JARVIS_IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+    steps:
       - name: Health check
         uses: appleboy/ssh-action@v1
         with:
@@ -228,12 +259,30 @@ jobs:
 
             echo "Deployed $JARVIS_VERSION (previous: ${previous:-none})"
 
-  # Sends the outcome to the owner's WhatsApp through Jarvis' own public API
-  # (POST /v1/messages). Runs even when an earlier job failed: in every failure
-  # case the old (or rolled-back) version is still up to deliver it.
+  # 6. Running containers: what is up on the VPS after the deploy (the new
+  # version, or the previous one after a rollback). Informational only.
+  status:
+    name: Running containers
+    needs: [deploy, health]
+    if: ${{ !cancelled() && needs.deploy.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: List containers
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+
+  # 7. Notify: sends the outcome to the owner's WhatsApp through Jarvis' own
+  # public API (POST /v1/messages). Runs even when an earlier job failed: in every
+  # failure case the old (or rolled-back) version is still up to deliver it.
   notify:
     name: Notify on WhatsApp
-    needs: [test, build, deploy]
+    needs: [test, version, build, deploy, health, status]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
@@ -244,8 +293,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           JARVIS_API_KEY: ${{ secrets.JARVIS_API_KEY }}
           API_DOMAIN: ${{ vars.API_DOMAIN }}
-          DEPLOY_RESULT: ${{ needs.deploy.result }}
-          VERSION_TAG: ${{ needs.build.outputs.tag }}
+          # The deploy only counts as done once the health check passed.
+          DEPLOY_RESULT: ${{ needs.health.result }}
+          VERSION_TAG: ${{ needs.version.outputs.tag }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -261,19 +311,20 @@ jobs:
           if [ "$DEPLOY_RESULT" = "success" ]; then
             message="$(printf 'Deploy feito com sucesso!\n\nVersão: %s\nCommit: %s' "$version" "$commit")"
           else
-            # First failed job and its first failed step, e.g. "Deploy to VPS|Health check".
+            # First failed job and its first failed step, e.g. "Deploy to VPS|Run migrations".
             failed="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
               --jq '[.jobs[] | select(.conclusion == "failure") | "\(.name)|\([.steps[]? | select(.conclusion == "failure") | .name] | first // "")"] | first // "|"')" || failed="|"
             failed_job="${failed%%|*}"
             failed_step="${failed#*|}"
 
             case "$failed" in
-              "Test (server)|"*)          reason="os testes do backend falharam. Nada foi publicado; a versão atual segue no ar." ;;
-              "Build & push images|"*)    reason="o build das imagens falhou. Nada foi publicado; a versão atual segue no ar." ;;
-              *"|Pull images")            reason="a VPS não conseguiu baixar as imagens novas. A versão atual segue no ar." ;;
-              *"|Run migrations")         reason="as migrations do banco falharam. A versão atual segue no ar." ;;
-              *"|Restart server and web") reason="não foi possível recriar os containers server e web." ;;
-              *"|Health check")           reason="o server não ficou de pé 20 s depois de subir. O pipeline voltou para a versão anterior, se havia uma." ;;
+              "Tests|"*)                               reason="os testes do backend falharam. Nada foi publicado; a versão atual segue no ar." ;;
+              "Image version|"*)                       reason="o arquivo VERSION não está no formato MAJOR.MINOR.PATCH. Nada foi publicado; a versão atual segue no ar." ;;
+              "Build & push images|"*)                 reason="o build das imagens falhou. Nada foi publicado; a versão atual segue no ar." ;;
+              "Deploy to VPS|Pull images")             reason="a VPS não conseguiu baixar as imagens novas. A versão atual segue no ar." ;;
+              "Deploy to VPS|Run migrations")          reason="as migrations do banco falharam. A versão atual segue no ar." ;;
+              "Deploy to VPS|Restart server and web")  reason="não foi possível recriar os containers server e web." ;;
+              "Health check & rollback|"*)             reason="o server não ficou de pé 20 s depois de subir. O pipeline voltou para a versão anterior, se havia uma." ;;
               *)                          reason="falha em ${failed_job:-etapa desconhecida}${failed_step:+ › $failed_step}." ;;
             esac
 

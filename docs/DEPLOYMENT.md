@@ -131,11 +131,15 @@ docker compose up -d --no-deps --force-recreate server
 
 ## 5. CI/CD (GitHub Actions + Docker Hub)
 
-Depois do primeiro `docker compose up`, as atualizacoes nao sao mais feitas a mao. Todo `git push` na `main` dispara `.github/workflows/deploy.yml`, que roda tres jobs em sequencia:
+Depois do primeiro `docker compose up`, as atualizacoes nao sao mais feitas a mao. Todo `git push` na `main` dispara `.github/workflows/deploy.yml`, que tem um job por etapa, em sequencia (cada um so roda se o anterior passou):
 
-1. **Test**: `npm ci`, `prisma generate` e `npm test` do `server/`. Se falhar, nada e publicado.
-2. **Build & push**: gera as imagens `jarvis-server` (stage `production`), `jarvis-migrate` (stage `builder`, que tem o CLI do Prisma) e `jarvis-web` (com `VITE_API_URL` embutido) e envia ao Docker Hub. As imagens sao **so `linux/arm64`**, porque a VPS e ARM; o build roda num runner ARM nativo (`ubuntu-24.04-arm`, gratuito em repositorio publico). Se a VPS mudar para x86, troque `platforms` para `linux/amd64` e o runner para `ubuntu-latest`.
-3. **Deploy**: entra na VPS por SSH, atualiza o checkout (`git pull`, que traz o `compose.yml`), baixa as imagens novas, roda as migrations e recria **apenas** os containers `server` e `web`. Redis, Securo, Traefik e `postgres` nao sao recriados; o `docker compose run migrate` so sobe o `postgres` (pelo `depends_on`) se ele nao estiver de pe.
+1. **Tests**: `npm ci`, `prisma generate` e `npm test` do `server/`. Se falhar, nada e publicado.
+2. **Image version**: le o arquivo `VERSION`, recusa o que nao for `MAJOR.MINOR.PATCH` e gera a tag `<VERSION>-<hash curto>` usada por todos os jobs seguintes (ver *Versao da imagem*).
+3. **Build & push images**: gera as imagens `jarvis-server` (stage `production`), `jarvis-migrate` (stage `builder`, que tem o CLI do Prisma) e `jarvis-web` (com `VITE_API_URL` embutido) e envia ao Docker Hub. As imagens sao **so `linux/arm64`**, porque a VPS e ARM; o build roda num runner ARM nativo (`ubuntu-24.04-arm`, gratuito em repositorio publico). Se a VPS mudar para x86, troque `platforms` para `linux/amd64` e o runner para `ubuntu-latest`.
+4. **Deploy to VPS**: entra na VPS por SSH, atualiza o checkout (`git pull`, que traz o `compose.yml`), baixa as imagens novas, roda as migrations e recria **apenas** os containers `server` e `web`. Redis, Securo, Traefik e `postgres` nao sao recriados; o `docker compose run migrate` so sobe o `postgres` (pelo `depends_on`) se ele nao estiver de pe.
+5. **Health check & rollback**: confere se o server ficou de pe e, se nao, volta para a versao anterior (ver *Health check e rollback*).
+6. **Running containers**: mostra no log o `docker ps` da VPS (nome, imagem e status), tanto depois de um deploy bem-sucedido quanto depois de um rollback. E so informativo: nunca derruba o pipeline.
+7. **Notify on WhatsApp**: roda sempre e manda o resultado no WhatsApp (ver *Aviso no WhatsApp*).
 
 ### Versao da imagem
 
@@ -156,14 +160,15 @@ Os repositorios do Docker Hub sao criados no primeiro push. Se ficarem privados,
 
 ### Health check e rollback
 
-Vinte segundos depois de subir, o deploy confere se o `jarvis-server` esta `running` sem reinicios. Se nao estiver, imprime os logs, volta `server` e `web` para a versao anterior e marca o job como falho. As migrations ja aplicadas **nao** sao desfeitas, entao mantenha as migrations compativeis com a versao anterior (adicionar colunas/tabelas, nunca remover no mesmo deploy).
+Vinte segundos depois de subir, o job *Health check & rollback* confere se o `jarvis-server` esta `running` sem reinicios. Se nao estiver, imprime os logs, volta `server` e `web` para a versao anterior e marca o job como falho. As migrations ja aplicadas **nao** sao desfeitas, entao mantenha as migrations compativeis com a versao anterior (adicionar colunas/tabelas, nunca remover no mesmo deploy).
 
 ### Aviso no WhatsApp
 
 O ultimo job (`notify`) roda sempre, mesmo quando uma etapa anterior falha, e manda o resultado para o WhatsApp do dono da `JARVIS_API_KEY` usando a propria API publica do Jarvis (`POST https://<API_DOMAIN>/v1/messages`). Em todos os casos de falha a versao antiga (ou a restaurada pelo rollback) continua no ar para entregar a mensagem.
 
 - Sucesso: `Deploy feito com sucesso!` com a versao e o titulo do commit.
-- Falha: `Deploy falhou.` com a versao, o commit, o motivo (testes, build, pull, migrations, troca dos containers ou health check) e o link dos logs. O motivo vem do nome do passo que falhou: por isso o deploy e dividido em quatro passos SSH, e os nomes deles nao devem mudar sem atualizar o `case` do job `notify`.
+- Falha: `Deploy falhou.` com a versao, o commit, o motivo (testes, `VERSION` invalido, build, pull, migrations, troca dos containers ou health check) e o link dos logs. O motivo vem do nome do job que falhou e, no *Deploy to VPS*, do nome do passo SSH (pull, migrations, troca dos containers). Por isso os nomes dos jobs e desses passos nao devem mudar sem atualizar o `case` do job `notify`.
+- O deploy so conta como sucesso quando o health check passa.
 
 A API aceita 1 requisicao por minuto por chave, contando inclusive as que falham. Por isso, em `503` (WhatsApp ainda reconectando), `429`, `502`, `504` ou erro de rede, o job espera 65 s e tenta de novo, ate 4 vezes. Use uma chave so para o deploy, para nao disputar esse limite com outros usos. Se a mensagem nao sair, o job `notify` fica vermelho, mas o deploy em si ja terminou.
 
