@@ -18,7 +18,7 @@ nano .env
 
 No `.env` da raiz (interpolacao do `compose.yml`), defina `JARVIS_DB_PASSWORD`, a senha do Postgres do Jarvis. Ela entra numa URL de conexao, entao precisa ser URL-safe; gere com `openssl rand -hex 24`. Sem ela o `docker compose` recusa subir. Opcionalmente, `JARVIS_DB_HOST_PORT` troca a porta publicada no `127.0.0.1` (padrao `5432`).
 
-No arquivo `server/.env`, preencha `WHATSAPP_AUTH_ENCRYPTION_KEY` e `ASSISTANT_WORKFLOW_KEY`. Defina ainda `AI_EXTRACTION_PROVIDER` (`openai` ou `groq`, gera nome e descricao das bases de conhecimento), `AI_EMBEDDING_PROVIDER=openai` (embeddings do RAG das bases) e `OPENAI_API_KEY`, que e sempre obrigatoria; `GROQ_API_KEY` so e exigida com `AI_EXTRACTION_PROVIDER=groq`. Sem as chaves o servidor nao sobe, e a variavel antiga `AI_PROVIDER` sozinha tambem derruba o boot. A `DATABASE_URL` do `server/.env` so vale para o dev local (`localhost:5432`): no Docker o compose injeta em `server` e `migrate` a URL do servico `postgres`.
+No arquivo `server/.env`, preencha `WHATSAPP_AUTH_ENCRYPTION_KEY` e `ASSISTANT_WORKFLOW_KEY`. Defina ainda `AI_EXTRACTION_PROVIDER` (`openai` ou `groq`, gera nome e descricao das bases de conhecimento), `AI_EMBEDDING_PROVIDER=openai` (embeddings do RAG das bases), `AI_TRANSCRIPTION_PROVIDER=groq` (transcricao dos audios recebidos no WhatsApp) e as duas chaves, `OPENAI_API_KEY` (embeddings) e `GROQ_API_KEY` (transcricao), que sao sempre obrigatorias. Sem as chaves o servidor nao sobe, e a variavel antiga `AI_PROVIDER` sozinha tambem derruba o boot. A `DATABASE_URL` do `server/.env` so vale para o dev local (`localhost:5432`): no Docker o compose injeta em `server` e `migrate` a URL do servico `postgres`.
 
 Depois suba o projeto:
 
@@ -84,6 +84,13 @@ docker network connect jarvis-internal n8n
 O volume `n8n_data` nao e removido nesses comandos, portanto credenciais, usuarios e workflows sao preservados.
 
 Sempre que o `n8n.json` do repositorio mudar (por exemplo, o no *Build prompt*), copie o no alterado para o workflow de producao por esse tunel: o deploy do CI nao atualiza o n8n. Nao importe o arquivo inteiro, porque o no *Config* do export aponta para um devtunnel de desenvolvimento.
+
+### Mensagens como ferramenta e audio: backend e workflow sobem juntos
+
+A versao em que o assistente passou a falar pela ferramenta `enviar_mensagem` mudou o contrato da resposta do webhook: o n8n responde so `{ "status": "COMPLETED" }` e envia cada mensagem durante a run por `POST /assistant-m2m/runs/:runId/messages`. Backend novo com workflow antigo (que ainda devolve `{ response }`) marca toda run como `FAILED` e o usuario so recebe o aviso generico de falha; workflow novo com backend antigo tambem nao entrega nada. Atualize os dois na mesma janela:
+
+1. Antes do deploy, garanta `GROQ_API_KEY` preenchida no `server/.env` da VPS (agora sempre obrigatoria, por causa da transcricao de audio; sem ela o server novo nao sobe e o health check faz rollback) e, se quiser deixar explicito, `AI_TRANSCRIPTION_PROVIDER=groq` (ja e o padrao). O deploy aplica a migration `20261119120000_add_message_content_type`, que so adiciona a coluna `messages.contentType` com default e e compativel com a versao anterior.
+2. Logo depois do deploy, pelo tunel, leve para o workflow de producao: o codigo do no *Build prompt*; o no de ferramenta `enviar_mensagem` (ligado ao *AI Agent*, com a mesma credencial Header Auth do `executar_ferramenta`); o corpo `{ status: 'COMPLETED' }` nos nos *Respond to Webhook* e *Respond empty*; `maxIterations = 12` no *AI Agent*. Remova os nos *Simple Memory* e *Format response* (o *AI Agent* liga direto no *Respond to Webhook*).
 
 ## 4. Banco do Jarvis (Postgres local)
 

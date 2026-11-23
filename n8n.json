@@ -170,7 +170,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Runs after \"Get context\" and \"Get tools\".\n//\n// Output:\n//   systemPrompt → AI Agent › Options › System Message  ({{ $json.systemPrompt }})\n//   userPrompt   → AI Agent › Prompt (Define below)      ({{ $json.userPrompt }})\n//   runId        → used by the executar_ferramenta tool  ({{ $('Build prompt').item.json.runId }})\n//   sessionKey   → used by the Simple Memory node        ({{ $('Build prompt').item.json.sessionKey }})\n//\n// The system prompt carries instructions, the tool reference of the user's\n// plan and the context of the day; everything the user or Jarvis said goes\n// to the prompt as data inside tags.\n\nconst context = $('Get context').item.json;\nconst toolset = $('Get tools').item.json;\nconst runId = $('Config').item.json.runId;\n\n// Angle brackets in user content are neutralised so a message can never\n// close or open one of the context tags below (prompt-injection guard).\nconst escapeTags = (value) =>\n  String(value ?? '').replace(/</g, '‹').replace(/>/g, '›');\n\nconst messages = [...(context.lastMessages ?? [])];\nconst ordered = messages.every((message) => message.createdAt)\n  ? messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))\n  : messages.reverse(); // backend sends newest first\n\nconst history = ordered\n  .filter(\n    (message) =>\n      !(message.type === 'AI' && /plano atual não inclui|não disponho de busca na web/i.test(String(message.content ?? ''))),\n  )\n  .map((message) => {\n    const author = message.type === 'AI' ? 'jarvis' : 'usuario';\n    return `<mensagem autor=\"${author}\">${escapeTags(message.content)}</mensagem>`;\n  })\n  .join('\\n');\n\nconst timezone = context.timezone || 'America/Sao_Paulo';\nconst fallbackNow = new Date();\nconst nowIso = context.now || fallbackNow.toISOString();\nconst nowHuman =\n  context.nowHuman ||\n  new Intl.DateTimeFormat('pt-BR', {\n    timeZone: timezone,\n    dateStyle: 'full',\n    timeStyle: 'short',\n  }).format(fallbackNow);\n\nconst rawProfileContext = (context.profileContext || '').trim();\nconst profileName = (context.profileName || '').trim();\nconst profileContext =\n  [\n    profileName && !/^Nome:/im.test(rawProfileContext)\n      ? `Nome: ${profileName}`\n      : '',\n    rawProfileContext,\n  ]\n    .filter(Boolean)\n    .join('\\n') || 'Nenhuma informação adicional sobre o usuário.';\n\nconst sessionKey =\n  typeof context.sessionKey === 'string' && context.sessionKey.trim()\n    ? context.sessionKey.trim()\n    : runId;\n\nconst knowledge = (Array.isArray(context.knowledge) ? context.knowledge : []).map(\n  ({ id, name, description }) => ({ id, name, description }),\n);\n\n// Knowledge bases: RAG search first, whole-base read second. Only rendered\n// when the user has at least one base (the tool exists in their plan).\nconst knowledgeRules = knowledge.length\n  ? [\n      '# Regra obrigatória das bases de conhecimento (prioridade sobre as demais regras)',\n      'O usuário tem bases de conhecimento cadastradas (lista em <bases_de_conhecimento>). Siga estes passos, nesta ordem:',\n      '1. SEMPRE, SEMPRE, SEMPRE que alguma informação das bases do usuário puder ser útil para responder ou executar o pedido, por menor que seja a chance, busque PRIMEIRO no RAG: chame executar_ferramenta com tool \"database_information\", operation \"search_knowledge\" e data {\"query\": \"<palavras-chave do que procurar>\"}. Faça isso antes de responder, de perguntar algo ao usuário ou de dizer que não sabe. Na dúvida, busque. Escreva a query sem pronomes, resolvendo referências pelo histórico (\"e o dela?\" vira \"telefone da Ana\").',\n      '2. Se a busca no RAG não trouxer o necessário (found false ou trechos que não respondem) e a description de alguma base em <bases_de_conhecimento> indicar que ela pode ser útil ou colaborar com a resposta, leia essa base inteira: executar_ferramenta com tool \"database_information\", operation \"get_database_information\" e data {\"databaseInformationId\": \"<id da base>\"}. Use também essa leitura quando o pedido exigir a base completa (listar tudo, contar itens, resumir).',\n      '3. Responda usando apenas o conteúdo retornado. Só diga que não encontrou depois dos passos 1 e 2.',\n      'Não consulte as bases em cumprimentos, agradecimentos ou pedidos que claramente não dependem delas.',\n    ].join('\\n')\n  : '';\n\nconst cachedEvents = Array.isArray(context.cachedEvents)\n  ? context.cachedEvents\n  : [];\n\nconst rawDirective = String(context.directive ?? '')\n  .replace(\n    /- As ferramentas listadas são as que o plano do usuário inclui\\.[^\\n]*/g,\n    '- Apenas quando o usuário pedir uma funcionalidade interna do Jarvis (lembretes, finanças ou base de conhecimento) ausente em \"Ferramentas disponíveis\", informe que faz parte de outro plano. Para buscas na web (clima, notícias, fatos atuais, eleições, cotações) ou dúvidas gerais, NUNCA diga que o plano não inclui: use a ferramenta browser_search.',\n  );\n\nconst browserSearchReference = [\n  '## Ferramenta direta \"browser_search\" (incluída em todos os planos): Busca na web em tempo real',\n  'Quando usar: Sempre que o usuário pedir informações atuais, clima, notícias, eleições, cotações, fatos recentes ou pedir para pesquisar na web.',\n  'Como chamar: Acione diretamente a tool `browser_search` passando o parâmetro `query` (NÃO use `executar_ferramenta` para ela).',\n  'Importante: Você TEM acesso à busca na web em todos os planos. Ignore qualquer mensagem antiga em <historico_recente> onde tenha dito que não possui busca na web ou que o plano atual não inclui isso.',\n].join('\\n');\n\nconst systemPrompt = [\n  rawDirective,\n  '',\n  toolset.reference ?? '',\n  '',\n  browserSearchReference,\n  '',\n  '# Contexto desta conversa',\n  '',\n  '<data_e_hora_atual>',\n  `${nowHuman} (${nowIso}, fuso ${timezone})`,\n  '</data_e_hora_atual>',\n  '',\n  '<perfil_do_usuario>',\n  escapeTags(profileContext),\n  '</perfil_do_usuario>',\n  '',\n  '<eventos_em_cache>',\n  escapeTags(JSON.stringify(cachedEvents)),\n  '</eventos_em_cache>',\n  '',\n  ...(knowledgeRules ? [knowledgeRules, ''] : []),\n  '<bases_de_conhecimento>',\n  escapeTags(JSON.stringify(knowledge)),\n  '</bases_de_conhecimento>',\n  '',\n  '<historico_recente>',\n  history || 'Nenhuma mensagem anterior.',\n  '</historico_recente>',\n].join('\\n');\n\nconst currentMessage = String(context.currentMessage ?? '');\n\nconst userPrompt = [\n  '<mensagem_atual>',\n  escapeTags(currentMessage),\n  '</mensagem_atual>',\n].join('\\n');\n\nreturn {\n  json: {\n    runId,\n    sessionKey,\n    hasMessage: currentMessage.trim().length > 0,\n    systemPrompt,\n    userPrompt,\n  },\n};"
+        "jsCode": "// Runs after \"Get context\" and \"Get tools\".\n//\n// Output:\n//   systemPrompt → AI Agent › Options › System Message  ({{ $json.systemPrompt }})\n//   userPrompt   → AI Agent › Prompt (Define below)      ({{ $json.userPrompt }})\n//   runId        → used by the executar_ferramenta and enviar_mensagem tools\n//                  ({{ $('Build prompt').item.json.runId }})\n//\n// The agent never answers through its final text: every message to the user\n// is a call to enviar_mensagem (POST /assistant-m2m/runs/:runId/messages).\n// There is no memory node: the backend history (<historico_recente>) already\n// holds every message that was really sent.\n//\n// The system prompt carries instructions, the tool reference of the user's\n// plan and the context of the day; everything the user or Jarvis said goes\n// to the prompt as data inside tags.\n\nconst context = $('Get context').item.json;\nconst toolset = $('Get tools').item.json;\nconst runId = $('Config').item.json.runId;\n\n// Angle brackets in user content are neutralised so a message can never\n// close or open one of the context tags below (prompt-injection guard).\nconst escapeTags = (value) =>\n  String(value ?? '').replace(/</g, '‹').replace(/>/g, '›');\n\nconst messages = [...(context.lastMessages ?? [])];\nconst ordered = messages.every((message) => message.createdAt)\n  ? messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))\n  : messages.reverse(); // backend sends newest first\n\nconst history = ordered\n  .filter(\n    (message) =>\n      !(message.type === 'AI' && /plano atual não inclui|não disponho de busca na web/i.test(String(message.content ?? ''))),\n  )\n  .map((message) => {\n    const author = message.type === 'AI' ? 'jarvis' : 'usuario';\n    const kind = message.contentType === 'AUDIO' ? ' tipo=\"audio\"' : '';\n    return `<mensagem autor=\"${author}\"${kind}>${escapeTags(message.content)}</mensagem>`;\n  })\n  .join('\\n');\n\nconst timezone = context.timezone || 'America/Sao_Paulo';\nconst fallbackNow = new Date();\nconst nowIso = context.now || fallbackNow.toISOString();\nconst nowHuman =\n  context.nowHuman ||\n  new Intl.DateTimeFormat('pt-BR', {\n    timeZone: timezone,\n    dateStyle: 'full',\n    timeStyle: 'short',\n  }).format(fallbackNow);\n\nconst rawProfileContext = (context.profileContext || '').trim();\nconst profileName = (context.profileName || '').trim();\nconst profileContext =\n  [\n    profileName && !/^Nome:/im.test(rawProfileContext)\n      ? `Nome: ${profileName}`\n      : '',\n    rawProfileContext,\n  ]\n    .filter(Boolean)\n    .join('\\n') || 'Nenhuma informação adicional sobre o usuário.';\n\nconst knowledge = (Array.isArray(context.knowledge) ? context.knowledge : []).map(\n  ({ id, name, description }) => ({ id, name, description }),\n);\n\n// Knowledge bases: RAG search first, whole-base read second. Only rendered\n// when the user has at least one base (the tool exists in their plan).\nconst knowledgeRules = knowledge.length\n  ? [\n      '# Regra obrigatória das bases de conhecimento (prioridade sobre as demais regras)',\n      'O usuário tem bases de conhecimento cadastradas (lista em <bases_de_conhecimento>). Siga estes passos, nesta ordem:',\n      '1. SEMPRE, SEMPRE, SEMPRE que alguma informação das bases do usuário puder ser útil para responder ou executar o pedido, por menor que seja a chance, busque PRIMEIRO no RAG: chame executar_ferramenta com tool \"database_information\", operation \"search_knowledge\" e data {\"query\": \"<palavras-chave do que procurar>\"}. Faça isso antes de responder, de perguntar algo ao usuário ou de dizer que não sabe. Na dúvida, busque. Escreva a query sem pronomes, resolvendo referências pelo histórico (\"e o dela?\" vira \"telefone da Ana\").',\n      '2. Se a busca no RAG não trouxer o necessário (found false ou trechos que não respondem) e a description de alguma base em <bases_de_conhecimento> indicar que ela pode ser útil ou colaborar com a resposta, leia essa base inteira: executar_ferramenta com tool \"database_information\", operation \"get_database_information\" e data {\"databaseInformationId\": \"<id da base>\"}. Use também essa leitura quando o pedido exigir a base completa (listar tudo, contar itens, resumir).',\n      '3. Responda usando apenas o conteúdo retornado. Só diga que não encontrou depois dos passos 1 e 2.',\n      'Não consulte as bases em cumprimentos, agradecimentos ou pedidos que claramente não dependem delas.',\n    ].join('\\n')\n  : '';\n\nconst cachedEvents = Array.isArray(context.cachedEvents)\n  ? context.cachedEvents\n  : [];\n\nconst rawDirective = String(context.directive ?? '')\n  .replace(\n    /- As ferramentas listadas são as que o plano do usuário inclui\\.[^\\n]*/g,\n    '- Apenas quando o usuário pedir uma funcionalidade interna do Jarvis (lembretes, finanças ou base de conhecimento) ausente em \"Ferramentas disponíveis\", informe que faz parte de outro plano. Para buscas na web (clima, notícias, fatos atuais, eleições, cotações) ou dúvidas gerais, NUNCA diga que o plano não inclui: use a ferramenta browser_search.',\n  );\n\nconst browserSearchReference = [\n  '## Ferramenta direta \"browser_search\" (incluída em todos os planos): Busca na web em tempo real',\n  'Quando usar: Sempre que o usuário pedir informações atuais, clima, notícias, eleições, cotações, fatos recentes ou pedir para pesquisar na web.',\n  'Como chamar: Acione diretamente a tool `browser_search` passando o parâmetro `query` (NÃO use `executar_ferramenta` para ela).',\n  'Importante: Você TEM acesso à busca na web em todos os planos. Ignore qualquer mensagem antiga em <historico_recente> onde tenha dito que não possui busca na web ou que o plano atual não inclui isso.',\n].join('\\n');\n\nconst sendMessageReference = [\n  '## Ferramenta direta \"enviar_mensagem\" (incluída em todos os planos): Envia uma mensagem de WhatsApp ao usuário',\n  'Quando usar: Sempre que for dizer qualquer coisa ao usuário. É o único jeito de ele ler você; o texto final da sua resposta não é entregue.',\n  'Como chamar: Acione diretamente a tool `enviar_mensagem` passando o parâmetro `content` com o texto da mensagem (NÃO use `executar_ferramenta` para ela). Uma mensagem por chamada; pode chamar mais de uma vez no mesmo atendimento.',\n].join('\\n');\n\nconst systemPrompt = [\n  rawDirective,\n  '',\n  toolset.reference ?? '',\n  '',\n  sendMessageReference,\n  '',\n  browserSearchReference,\n  '',\n  '# Contexto desta conversa',\n  '',\n  '<data_e_hora_atual>',\n  `${nowHuman} (${nowIso}, fuso ${timezone})`,\n  '</data_e_hora_atual>',\n  '',\n  '<perfil_do_usuario>',\n  escapeTags(profileContext),\n  '</perfil_do_usuario>',\n  '',\n  '<eventos_em_cache>',\n  escapeTags(JSON.stringify(cachedEvents)),\n  '</eventos_em_cache>',\n  '',\n  ...(knowledgeRules ? [knowledgeRules, ''] : []),\n  '<bases_de_conhecimento>',\n  escapeTags(JSON.stringify(knowledge)),\n  '</bases_de_conhecimento>',\n  '',\n  '<historico_recente>',\n  history || 'Nenhuma mensagem anterior.',\n  '</historico_recente>',\n].join('\\n');\n\nconst currentMessage = String(context.currentMessage ?? '');\n\n// AUDIO = automatic transcription of a voice message (see the directive).\nconst currentMessageTag =\n  context.currentMessageType === 'AUDIO'\n    ? '<mensagem_atual tipo=\"audio\">'\n    : '<mensagem_atual>';\n\nconst userPrompt = [\n  currentMessageTag,\n  escapeTags(currentMessage),\n  '</mensagem_atual>',\n].join('\\n');\n\nreturn {\n  json: {\n    runId,\n    hasMessage: currentMessage.trim().length > 0,\n    systemPrompt,\n    userPrompt,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -219,7 +219,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { response: 'Não foi possível processar a mensagem agora.' } }}",
+        "responseBody": "={{ { status: 'COMPLETED' } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -237,7 +237,7 @@
         "text": "={{ $json.userPrompt }}",
         "options": {
           "systemMessage": "={{ $json.systemPrompt }}",
-          "maxIterations": 8
+          "maxIterations": 12
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -274,21 +274,6 @@
     },
     {
       "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Build prompt').item.json.sessionKey }}",
-        "contextWindowLength": 10
-      },
-      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-      "typeVersion": 1.3,
-      "position": [
-        608,
-        512
-      ],
-      "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d00",
-      "name": "Simple Memory"
-    },
-    {
-      "parameters": {
         "toolDescription": "Executa uma operação de qualquer ferramenta listada em \"Ferramentas disponíveis\" nas instruções. Informe tool (nome exato da ferramenta), operation (nome exato da operação dessa ferramenta) e data (campos da operação como objeto JSON serializado em string; \"{}\" quando não houver campos). Retorna o resultado da operação ou { \"error\": { \"code\", \"message\", \"fields\"? } } indicando o que corrigir.",
         "method": "POST",
         "url": "={{ $('Config').item.json.config.baseUrl }}/assistant-m2m/runs/{{ $('Build prompt').item.json.runId }}/tools/execute",
@@ -313,6 +298,39 @@
       ],
       "id": "e8a0c2e4-6b8d-4f0a-b3c5-7d9f1b3e5a77",
       "name": "executar_ferramenta",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LBtjjpRFbh0oMkNR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Envia uma mensagem de WhatsApp ao usuário. É a ÚNICA forma de falar com ele: toda resposta, pergunta, confirmação ou aviso precisa passar por aqui, e o texto final da sua resposta não é entregue. Uma mensagem por chamada; pode ser chamada mais de uma vez no mesmo atendimento (ex.: um aviso curto antes de uma busca demorada e, depois, o resultado). Retorna { \"sent\": true } ou { \"error\": { \"code\", \"message\" } }.",
+        "method": "POST",
+        "url": "={{ $('Config').item.json.config.baseUrl }}/assistant-m2m/runs/{{ $('Build prompt').item.json.runId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  content: $fromAI(\n    'content',\n    'Texto da mensagem exatamente como o usuário vai ler no WhatsApp: português do Brasil, texto simples, negrito com *um asterisco de cada lado*.',\n    'string'\n  )\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        512
+      ],
+      "id": "bba6f8a3-35ca-4687-8e4a-23c00cae7d09",
+      "name": "enviar_mensagem",
       "credentials": {
         "httpHeaderAuth": {
           "id": "LBtjjpRFbh0oMkNR",
@@ -355,22 +373,8 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const rawResponse = $json.output ?? $json.text;\n\nconst response =\n  typeof rawResponse === 'string' && rawResponse.trim()\n    ? rawResponse.trim()\n    : 'Desculpe, tive um problema aqui e não consegui responder agora. Pode repetir?';\n\nreturn {\n  json: {\n    response,\n  },\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        928,
-        288
-      ],
-      "id": "757af0f7-caa8-4316-819c-0b009ff7f104",
-      "name": "Format response"
-    },
-    {
-      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { response: $json.response } }}",
+        "responseBody": "={{ { status: 'COMPLETED' } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -504,17 +508,6 @@
       "main": [
         [
           {
-            "node": "Format response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format response": {
-      "main": [
-        [
-          {
             "node": "Respond to Webhook2",
             "type": "main",
             "index": 0
@@ -533,17 +526,6 @@
         ]
       ]
     },
-    "Simple Memory": {
-      "ai_memory": [
-        [
-          {
-            "node": "AI Agent1",
-            "type": "ai_memory",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "executar_ferramenta": {
       "ai_tool": [
         [
@@ -556,6 +538,17 @@
       ]
     },
     "browser_search": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enviar_mensagem": {
       "ai_tool": [
         [
           {

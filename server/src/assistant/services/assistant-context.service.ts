@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
+import { MessageContentType } from '@prisma/client';
 
 import { DatabaseInformationService } from '../../database-information/services/database-information.service';
 import { getEventsAssistantCacheKey } from '../../events/constants/events-cache.constant';
@@ -68,11 +69,16 @@ export class AssistantContextService {
       profileContext,
       sessionKey,
       currentMessage: currentMessage?.content ?? '',
-      lastMessages: history.map(({ type, content, createdAt }) => ({
-        type,
-        content,
-        createdAt,
-      })),
+      currentMessageType:
+        currentMessage?.contentType ?? MessageContentType.TEXT,
+      lastMessages: history.map(
+        ({ type, contentType, content, createdAt }) => ({
+          type,
+          contentType,
+          content,
+          createdAt,
+        }),
+      ),
       knowledge,
       cachedEvents,
       ...buildTemporalContext(profile.timezone),

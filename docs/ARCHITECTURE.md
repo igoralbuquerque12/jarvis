@@ -36,7 +36,7 @@ Cinco princípios guiaram as decisões e aparecem repetidamente ao longo deste d
 | Princípio | O que significa na prática |
 |---|---|
 | **WhatsApp-first** | O core recebe e envia mensagens por um socket Baileys persistente. O painel web é complementar: onboarding, visualização e configuração. |
-| **O modelo é um detalhe de implementação** | O backend não conhece nenhum SDK de LLM. Ele produz um contrato (prompt + catálogo de ferramentas + contexto) e consome outro (`{ response }`). Quem roda o modelo é o n8n. |
+| **O modelo é um detalhe de implementação** | O backend não conhece nenhum SDK de LLM. Ele produz um contrato (prompt + catálogo de ferramentas + contexto) e consome outro (as chamadas de ferramenta e de envio de mensagem que o agente faz durante a run, mais o `{ status: "COMPLETED" }` que a encerra). Quem roda o modelo é o n8n. |
 | **Contrato tipado entre humano, modelo e código** | Tudo que o modelo pode fazer está declarado em TypeScript, é validado por DTOs no backend e coberto por testes. Erros de validação são parte do protocolo, não exceções. |
 | **Isolamento por usuário em todas as camadas** | `Profile` é a unidade de isolamento: histórico, eventos, chaves de API, e um usuário dedicado (com workspace próprio) no motor financeiro. O `profileId` vem sempre do servidor, nunca do cliente. |
 | **Custo e simplicidade operacional** | Uma VPS, um `docker compose`, um banco gerenciado gratuito, um Redis. Cache para não martelar o banco, cron em vez de fila, sem Kubernetes. |
@@ -61,7 +61,7 @@ Números do repositório na data deste documento (10 de setembro de 2026):
 
 <p align="center"><img src="diagrams/01-context.svg" alt="Diagrama de contexto" width="100%"></p>
 
-O sistema tem dois tipos de usuário humano (a pessoa que conversa e a mesma pessoa usando o painel), um tipo de cliente máquina (sistemas do próprio usuário autenticados por API key) e quatro sistemas externos: os servidores do WhatsApp, o provedor de LLM (Groq, mais a OpenAI para extração e embeddings das bases de conhecimento) e, num grau intermediário, o Securo e o n8n, que rodam na mesma VPS mas são processos com ciclo de vida próprio.
+O sistema tem dois tipos de usuário humano (a pessoa que conversa e a mesma pessoa usando o painel), um tipo de cliente máquina (sistemas do próprio usuário autenticados por API key) e quatro sistemas externos: os servidores do WhatsApp, o provedor de LLM (Groq, que também transcreve os áudios recebidos, mais a OpenAI para extração e embeddings das bases de conhecimento) e, num grau intermediário, o Securo e o n8n, que rodam na mesma VPS mas são processos com ciclo de vida próprio.
 
 As fronteiras importantes:
 
@@ -141,9 +141,10 @@ As migrations do Jarvis rodam num container separado (`migrate`) que usa o **mes
 | `AuthModule` | Instância do better-auth, sessão, hooks de criação de usuário. | `BetterAuthService` (`instance`, `getSession`, `requireSession`). |
 | `ProfileModule` | O `Profile`: criação a partir do usuário autenticado, token de pareamento, view para a web. | `ProfileService.ensureAuthProfile`, `toProfileMeView`. |
 | `SubscriptionModule` | Planos. Garante o Free Tier. | `SubscriptionService.ensureDefaultSubscription`. |
-| `MessagesModule` | Histórico de conversa por perfil. | `MessagesService.findAll({ userId, take, before })`, `findUserMessageOfRun(runId)`. |
+| `MessagesModule` | Histórico de conversa por perfil. | `MessagesService.findAll({ userId, take, before })`, `findUserMessageOfRun(runId)`, `countAiMessagesOfRun(runId)`. |
 | `WhatsappModule` | Socket Baileys, recepção, envio, credenciais cifradas, guard administrativo. | `WhatsappConnectionService`, `WhatsappReceiverService`, `WhatsappSenderService`, `BaileysAuthStore`, `WhatsappAuthCryptoService`, `WhatsappAdminGuard`. |
-| `AssistantModule` | O loop de mensagens, as runs, o prompt, o catálogo de ferramentas, os endpoints M2M que o n8n chama (`/assistant-m2m/runs/*`), o cliente do n8n e o pareamento. | `AssistantMainService`, `AssistantRunService`, `AssistantContextService`, `AssistantM2mController`, `AssistantToolRegistry`, `AssistantToolDispatcherService`, `AssistantWorkflowService`, `AssistantConnectionService`, `ASSISTANT_TOOLS`. |
+| `AssistantModule` | O loop de mensagens, as runs, o prompt, o catálogo de ferramentas, os endpoints M2M que o n8n chama (`/assistant-m2m/runs/*`), o envio das mensagens do agente, a transcrição dos áudios recebidos, o cliente do n8n e o pareamento. | `AssistantMainService`, `AssistantRunService`, `AssistantContextService`, `AssistantMessageService`, `AssistantAudioService`, `AssistantM2mController`, `AssistantToolRegistry`, `AssistantToolDispatcherService`, `AssistantWorkflowService`, `AssistantConnectionService`, `ASSISTANT_TOOLS`. |
+| `AiModule` | Único ponto em que o backend chama um modelo diretamente, com um contrato por capacidade e um provedor escolhido por variável de ambiente: extração estruturada, embeddings e transcrição de áudio (`AI_TRANSCRIPTION_PROVIDER`, só `groq`, `whisper-large-v3-turbo`). | `AiProvider`, `EmbeddingProvider`, `TranscriptionProvider` (contratos e tokens de DI), `AiService`, `EmbeddingService`, `TranscriptionService` (retry). |
 | `EventsModule` | Séries e execuções, scheduler, handler da ferramenta `events` e endpoints web. | `EventsSchedule` (`@Cron`), `EventsM2mService`, `EventsToolService`, `EventSeriesService`, `EventExecutionService`. |
 | `FinanceModule` | Cliente do Securo, provisioning, contexto por perfil, 7 submódulos de domínio, handler da ferramenta `finance`. | `SecuroApiService`, `SecuroProvisioningService`, `SecuroContextService`, `FinanceToolService`, `*Service` por área. |
 | `ApiKeysModule` | Ciclo de vida das chaves e o guard de API key. | `ApiKeysService`, `ApiKeyGuard`, `@ApiKeyProfile()`. |
@@ -177,7 +178,9 @@ Este é o caminho crítico do produto. Cada etapa abaixo cita o componente respo
 
 1. `type === 'notify'`. O Baileys também emite `append` para histórico sincronizado; ignorá-lo evita reprocessar conversas antigas quando a sessão reconecta.
 2. `!message.key.fromMe`. Mensagens enviadas pelo próprio número do assistente (inclusive as respostas do Jarvis) não voltam para o loop.
-3. Presença de texto. O receiver extrai `conversation`, `extendedTextMessage.text` ou a legenda de imagem/vídeo/documento. Sem texto, a mensagem é descartada.
+3. Presença de conteúdo (`message.message`), `jid` e id da mensagem. O receiver extrai o texto de `conversation`, `extendedTextMessage.text` ou da legenda de imagem/vídeo/documento.
+
+Um `audioMessage` (nota de voz ou arquivo de áudio) segue como `audio: { mimetype, seconds, download() }`. O `download` é preguiçoso (`downloadMediaMessage` do Baileys): os bytes só saem dos servidores do WhatsApp quando o assistente pede, depois da triagem (seção 5.3).
 
 O receiver não valida nem decide nada além disso; ele normaliza para `IncomingMessageDto` e chama `AssistantMainService.receiveMessage` sem aguardar (`void`), para nunca bloquear o event loop do socket.
 
@@ -192,7 +195,9 @@ O receiver não valida nem decide nada além disso; ele normaliza para `Incoming
 
 Com perfil, `AssistantRunService.start(profileId, waMessageId)` abre uma `AssistantRun` (tabela `assistant_runs`) com `status = PROCESSING`. O `waMessageId` é o `key.id` da mensagem no Baileys, e `@@unique([profileId, waMessageId])` é a guarda de idempotência: se o Baileys reentregar a mesma mensagem, o `INSERT` falha com `P2002`, `start` devolve `null` e a mensagem é ignorada sem chamar o n8n. Mensagens de números sem perfil (pareamento) nunca abrem run.
 
-Em seguida a mensagem atual é gravada como `type = user` com o `runId`. A tabela `messages` usa `userId` para guardar o `profile.id` (nome legado; não há FK) e ganhou `runId` opcional (FK com `onDelete: SetNull`).
+Se a mensagem é um áudio, ele só é baixado e transcrito neste ponto, com o perfil resolvido e a run aberta: uma reentrega ou um remetente sem perfil nunca custam uma transcrição. `AssistantAudioService.transcribe` recusa áudios acima de 10 minutos (pela duração anunciada) ou de 24 MB (depois do download) e chama o `TranscriptionProvider` do módulo `ai/` (`whisper-large-v3-turbo` na Groq, idioma `pt`, timeout de 60 s, com o mesmo retry dos outros provedores). Qualquer falha (limite, download, provedor, transcrição vazia) sai como `AssistantAudioError`, que carrega o texto a mostrar ao usuário: a run fica `FAILED` e ele recebe "Não consegui ouvir esse áudio. Pode mandar de novo ou escrever?" ou o aviso de que o áudio é longo demais (seção 5.5).
+
+Em seguida a mensagem atual é gravada como `type = user` com o `runId`; para um áudio, o `content` é a transcrição e `contentType` é `AUDIO` (o padrão é `TEXT`). `type` (`MessageType`: `user` | `AI`) continua sendo o autor; `contentType` (`MessageContentType`) diz como o conteúdo chegou. A tabela `messages` usa `userId` para guardar o `profile.id` (nome legado; não há FK) e ganhou `runId` opcional (FK com `onDelete: SetNull`).
 
 ### 5.4 O payload para o n8n
 
@@ -205,7 +210,8 @@ Em seguida a mensagem atual é gravada como `type = user` com o `runId`. A tabel
 | `directive` | `DEFAULT_DIRECTIVE` | Só o prompt estático (`guideline.config.ts`), sem a referência de ferramentas. |
 | `profileContext` | `profile.about` | Texto livre que o usuário edita no perfil ("sou dev, moro em SP, tenho dois filhos..."). |
 | `currentMessage` | mensagem `user` da run | `MessagesService.findUserMessageOfRun(runId)`. |
-| `lastMessages` | histórico | As 10 mensagens anteriores à atual (`before` = `createdAt` da mensagem da run), mais recente primeiro, reduzidas a `{ type, content, createdAt }`. |
+| `currentMessageType` | `contentType` da mesma mensagem | `TEXT` ou `AUDIO`. `AUDIO` avisa que `currentMessage` é uma transcrição automática e pode ter erros. |
+| `lastMessages` | histórico | As 10 mensagens anteriores à atual (`before` = `createdAt` da mensagem da run), mais recente primeiro, reduzidas a `{ type, contentType, content, createdAt }`. |
 | `knowledge` | `DatabaseInformationService.findIndexByProfile` | `[{ id, name, description }]`. Vazio quando o plano não inclui a ferramenta `database_information`. |
 | `now`, `nowHuman`, `timezone` | `buildTemporalContext(profile.timezone)` | `2026-09-10T14:30:00-03:00` e `quinta-feira, 10 de setembro de 2026 às 14:30`. Fuso inválido cai para `America/Sao_Paulo`. |
 
@@ -213,19 +219,23 @@ O `profileId` não é enviado: ele fica na run e o backend o resolve em cada cha
 
 `GET /assistant-m2m/runs/:runId/tools` devolve `{ tools, reference }`: o catálogo filtrado pelo plano do perfil e o mesmo catálogo renderizado em Markdown (`# Ferramentas disponíveis`, por `renderToolsReference`). O resultado é cacheado em memória por número de plano.
 
-Os dois endpoints (e o de execução, seção 6.4) só aceitam uma run que existe e ainda está `PROCESSING`: run inexistente responde `not_found`, run finalizada responde `conflict`.
+Os dois endpoints (e os de execução, seção 6.4, e de mensagens, seção 5.5) só aceitam uma run que existe e ainda está `PROCESSING`: run inexistente responde `not_found`, run finalizada responde `conflict`.
 
-`AssistantWorkflowService.fetch` faz `POST` com `x-api-key: ASSISTANT_WORKFLOW_KEY`, lança em status não-2xx e parseia a resposta com `ReceiveMessageWorkflowOutputSchema = z.object({ response: z.string() })`.
+`AssistantWorkflowService.fetch` faz `POST` com `x-api-key: ASSISTANT_WORKFLOW_KEY`, lança em status não-2xx e parseia a resposta com `ReceiveMessageWorkflowOutputSchema = z.object({ status: z.literal('COMPLETED') })`. A resposta do webhook não carrega texto: ela só diz que o workflow rodou até o fim. Qualquer outro corpo falha no parse e a run vira `FAILED`.
 
 ### 5.5 Resposta
 
-A resposta é gravada como `type = AI` (com o `runId`), enviada por `WhatsappSenderService.sendMessage(jid, text)` e a run é marcada `COMPLETED` com `finishedAt`. O sender lança `503 ServiceUnavailable` se o socket não está conectado e `500` se o envio falha; `AssistantMainService` captura tudo num `try/catch` único, loga, marca a run `FAILED` com a mensagem do erro em `error` (se ela já existia) e devolve `{ ok: false, error }`. Não há retry: uma falha de rede no n8n resulta em silêncio para o usuário, que naturalmente reenvia.
+O agente fala com o usuário **durante** a run, não na resposta do webhook. Cada mensagem é uma chamada do n8n (ferramenta `enviar_mensagem`, seção 6.2) a `POST /assistant-m2m/runs/:runId/messages` com `{ content }` (`SendRunMessageDto`: string com `trim`, de 1 a 4096 caracteres), que responde `{ sent: true }`. `AssistantMessageService.sendForRun` resolve a run ativa e chama `deliver`, que envia por `WhatsappSenderService.sendMessage(jid, text)` e **só depois** grava a mensagem como `type = AI` com o `runId`: o histórico guarda apenas o que foi de fato entregue. Uma run pode enviar várias mensagens (um "só um minuto" antes de uma busca e, depois, o resultado). Os erros voltam ao modelo no formato M2M: perfil sem `jid` → `409 conflict`; socket desconectado → `503 unavailable`.
+
+Quando o webhook responde `{ status: "COMPLETED" }`, `AssistantMainService` confere se a run enviou alguma coisa (`hasReplied`, uma contagem das mensagens `AI` da run). Se não enviou, o próprio backend manda `ASSISTANT_FALLBACK_REPLY` ("Tive um problema aqui e não consegui te responder agora.") antes de marcar a run `COMPLETED` com `finishedAt`.
+
+Tudo roda num `try/catch` único: um erro depois que a run existe é logado, a run é marcada `FAILED` com a mensagem em `error` e o método devolve `{ ok: false, error }`. Em seguida, em *best effort*, se a run ainda não tinha enviado nada, o usuário recebe o mesmo aviso padrão (ou o aviso específico de áudio, quando o erro é um `AssistantAudioError`); se o assistente já tinha falado, nada mais é enviado. `AssistantRunService.complete` e `fail` são idempotentes (`updateMany` filtrando `status = PROCESSING`, devolvendo se fecharam a run): fechar duas vezes, ou fechar uma run já finalizada, não muda nada. Não há retry: uma falha de rede no n8n resulta no aviso padrão, e o usuário naturalmente reenvia.
 
 ### 5.6 Propriedades do loop
 
 - **Stateless por mensagem.** Todo o contexto vem do banco a cada mensagem. Reiniciar o server não perde conversa.
 - **Idempotente por mensagem do WhatsApp.** Uma reentrega do Baileys com o mesmo `key.id` não abre segunda run nem chama o n8n. Uma run que ficou presa em `PROCESSING` (o processo caiu no meio) não é reprocessada, de propósito: refazer poderia executar uma ação duas vezes.
-- **Latência.** Dominada pelo modelo (1 a 3 iterações típicas) e pelos callbacks HTTP. O backend adiciona a abertura e o fechamento da run, duas escritas de mensagem, e os dois `GET` que o n8n faz antes de rodar o agente.
+- **Latência.** Dominada pelo modelo (1 a 3 iterações típicas) e pelos callbacks HTTP. O backend adiciona a abertura e o fechamento da run, uma escrita por mensagem (a do usuário e cada uma que o agente envia), os dois `GET` que o n8n faz antes de rodar o agente e, em áudios, a transcrição. Como as mensagens saem durante a run, o usuário pode receber um aviso curto antes de o agente terminar uma etapa demorada.
 
 ---
 
@@ -255,15 +265,16 @@ O arquivo [`n8n.json`](../n8n.json) é versionado e importável. Nós, em ordem:
 | **Config** | `code` | Define `baseUrl` do backend (`http://server:3000` na rede interna). |
 | **Get context** | `httpRequest` v4.2, `GET` | `/assistant-m2m/runs/:runId/context` com a credencial Header Auth. Falha → *Respond error* (`502`). |
 | **Get tools** | `httpRequest` v4.2, `GET` | `/assistant-m2m/runs/:runId/tools`. Falha → *Respond error* (`502`). |
-| **Build prompt** | `code` | Ordena o histórico por `createdAt`, escapa `<` e `>` do conteúdo do usuário (troca por `‹` `›`) e monta dois textos. **System prompt**: `directive` + `reference` das tools + `# Contexto desta conversa` com `<data_e_hora_atual>`, `<perfil_do_usuario>` e `<bases_de_conhecimento>`. **User prompt**: `<historico_recente>` + `<mensagem_atual>`. |
-| **Has message** | `if` | Mensagem atual vazia → *Respond empty* (`{ response: "Não foi possível processar a mensagem agora." }`); senão → *AI Agent*. |
-| **AI Agent** | `@n8n/n8n-nodes-langchain.agent` v3.1 | `text = userPrompt`, `systemMessage = systemPrompt`, `maxIterations = 8`. |
+| **Build prompt** | `code` | Ordena o histórico por `createdAt`, escapa `<` e `>` do conteúdo do usuário (troca por `‹` `›`) e monta dois textos. **System prompt**: `directive` + `reference` das tools + as referências das ferramentas diretas `enviar_mensagem` e `browser_search` + `# Contexto desta conversa` com `<data_e_hora_atual>`, `<perfil_do_usuario>`, `<eventos_em_cache>`, `<bases_de_conhecimento>` e `<historico_recente>`. **User prompt**: `<mensagem_atual>`. Falas que chegaram por áudio levam `tipo="audio"` na tag (`<mensagem_atual tipo="audio">`, `<mensagem autor="usuario" tipo="audio">`), a partir de `currentMessageType` e do `contentType` de cada item do histórico. |
+| **Has message** | `if` | Mensagem atual vazia → *Respond empty* (`{ status: "COMPLETED" }`, sem rodar o agente; o backend então envia o aviso padrão da seção 5.5); senão → *AI Agent*. |
+| **AI Agent** | `@n8n/n8n-nodes-langchain.agent` v3.1 | `text = userPrompt`, `systemMessage = systemPrompt`, `maxIterations = 12`. Sem nó de memória: o histórico é só o `<historico_recente>` vindo do backend. |
 | **Groq Chat Model** | `lmChatGroq` | `openai/gpt-oss-120b`, `temperature 0.2`. |
-| **executar_ferramenta** | `httpRequestTool` v4.2 | A única ferramenta do agente. Campos `tool`, `operation` e `data` (objeto JSON serializado em string) via `$fromAI(...)`; `POST /assistant-m2m/runs/:runId/tools/execute`. |
-| **Format response** | `code` | Pega `output` (ou `text`), faz `trim`, e cai num texto de desculpas se vier vazio. |
-| **Respond to Webhook** | `respondToWebhook` | `{ response }`. |
+| **executar_ferramenta** | `httpRequestTool` v4.2 | A ferramenta genérica do catálogo. Campos `tool`, `operation` e `data` (objeto JSON serializado em string) via `$fromAI(...)`; `POST /assistant-m2m/runs/:runId/tools/execute`. |
+| **enviar_mensagem** | `httpRequestTool` v4.2 | Ferramenta direta, em todos os planos, fora do catálogo e do `executar_ferramenta`. Campo `content` via `$fromAI(...)`; `POST /assistant-m2m/runs/:runId/messages`. É o único jeito de o agente falar com o usuário. |
+| **browser_search** | `httpRequestTool` v4.2 | Ferramenta direta de busca na web, em todos os planos. Chama a API da Groq, não o backend. |
+| **Respond to Webhook** | `respondToWebhook` | `{ status: "COMPLETED" }`. O texto final do agente é descartado. |
 
-Os nós HTTP usam `baseUrl` do *Config*, a mesma credencial Header Auth (`x-api-key: ASSISTANT_WORKFLOW_KEY`) e só levam o `runId` na rota: nem o n8n nem o modelo informam `profileId`. A ferramenta tem `neverError: true`, o que faz um `400` do backend virar *resultado* da tool em vez de erro do workflow. É esse detalhe que fecha o laço de correção: o modelo lê `{ "error": { "code": "validation_error", "fields": ... } }` e tenta de novo.
+Os nós HTTP que falam com o backend usam `baseUrl` do *Config*, a mesma credencial Header Auth (`x-api-key: ASSISTANT_WORKFLOW_KEY`) e só levam o `runId` na rota: nem o n8n nem o modelo informam `profileId`. As ferramentas `executar_ferramenta` e `enviar_mensagem` têm `neverError: true`, o que faz um `400` do backend virar *resultado* da tool em vez de erro do workflow. É esse detalhe que fecha o laço de correção: o modelo lê `{ "error": { "code": "validation_error", "fields": ... } }` e tenta de novo.
 
 ### 6.3 O system prompt em camadas
 
@@ -274,10 +285,12 @@ O prompt final tem três autores e é montado em três momentos:
 │ SYSTEM PROMPT                                                 │
 │ 1. DEFAULT_DIRECTIVE   (backend, estático; GET .../context)   │
 │    # Papel e objetivo · # Como o contexto chega               │
+│    # Como você fala com o usuário                             │
 │    # Fontes de verdade · # Regras de operação                 │
 │    # Ferramentas e erros · # Autonomia e confirmação          │
 │    # Quando perguntar · # Critérios de conclusão              │
-│    # Datas, horários e valores · # Formato · # Exemplos       │
+│    # Datas, horários e valores · # Formato das mensagens      │
+│    # Exemplos                                                 │
 ├──────────────────────────────────────────────────────────────┤
 │ 2. renderToolsReference(tools do plano)  (GET .../tools)      │
 │    # Ferramentas disponíveis (tudo via executar_ferramenta)   │
@@ -285,18 +298,23 @@ O prompt final tem três autores e é montado em três momentos:
 │    ### create_event · Quando usar · Campos · Exemplo · Obs.   │
 │    ## Ferramenta "finance": ... ## "database_information"     │
 ├──────────────────────────────────────────────────────────────┤
-│ 3. Contexto desta conversa      (n8n, com dados da run)       │
+│ 3. Ferramentas diretas          (n8n, nó Build prompt)        │
+│    ## "enviar_mensagem" · ## "browser_search"                 │
+├──────────────────────────────────────────────────────────────┤
+│ 4. Contexto desta conversa      (n8n, com dados da run)       │
 │    <data_e_hora_atual> ... </data_e_hora_atual>               │
 │    <perfil_do_usuario> ... </perfil_do_usuario>               │
+│    <eventos_em_cache> [...]                                   │
 │    <bases_de_conhecimento> [{id,name,description}]            │
+│    <historico_recente> <mensagem autor="usuario">...          │
+│      (tipo="audio" quando a fala é uma transcrição)           │
 ├──────────────────────────────────────────────────────────────┤
 │ USER PROMPT                     (n8n, com dados da run)       │
-│    <historico_recente> <mensagem autor="usuario">...          │
 │    <mensagem_atual> ... </mensagem_atual>                     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-A estrutura segue o esqueleto recomendado pelo guia de prompting do GPT-4.1 e incorpora os três "lembretes agênticos" (persistência, uso de ferramentas sem inventar dados, planejamento antes de cada chamada). Instruções ficam no system prompt; tudo que o usuário ou o Jarvis disseram vai no user prompt, como dado dentro de tags. Markdown delimita instruções, XML delimita contexto e dados; o único JSON no prompt é o índice de `<bases_de_conhecimento>`. O histórico é apresentado como demonstração implícita, por isso o escape de tags: uma mensagem do usuário nunca consegue fechar `</historico_recente>` ou `</mensagem_atual>` e injetar instruções.
+A estrutura segue o esqueleto recomendado pelo guia de prompting do GPT-4.1 e incorpora os três "lembretes agênticos" (persistência, uso de ferramentas sem inventar dados, planejamento antes de cada chamada). Instruções e contexto ficam no system prompt; a fala atual vai sozinha no user prompt. Tudo que o usuário ou o Jarvis disseram entra como dado dentro de tags. Markdown delimita instruções, XML delimita contexto e dados; o único JSON no prompt é o índice de `<bases_de_conhecimento>`. O histórico é apresentado como demonstração implícita, por isso o escape de tags: uma mensagem do usuário nunca consegue fechar `</historico_recente>` ou `</mensagem_atual>` e injetar instruções.
 
 O `ASSISTANT.md` na raiz documenta o diagnóstico que levou a este desenho (o agente respondia "significado de bom dia" porque recebia um JSON de configuração como fala do usuário e tinha tools sem descrição e sem parâmetros) e cada técnica aplicada, com referências.
 
@@ -318,7 +336,7 @@ O `ASSISTANT.md` na raiz documenta o diagnóstico que levou a este desenho (o ag
 }
 ```
 
-Uma única estratégia de exposição: o n8n tem **um nó de ferramenta genérico**, `executar_ferramenta`, com os campos `tool`, `operation` e `data`. O modelo escolhe a ferramenta e a operação pela referência renderizada no prompt (`renderToolsReference`, que explica que tudo passa por `executar_ferramenta` com `data` como JSON em texto). A precisão vem dessa referência detalhada e do feedback de validação do backend. `data` vai sempre como string JSON porque o tipo `json` do `$fromAI` rejeita objetos vazios, e várias operações não têm parâmetros.
+Uma única estratégia de exposição para o catálogo: o n8n tem **um nó de ferramenta genérico**, `executar_ferramenta`, com os campos `tool`, `operation` e `data`. (As ferramentas diretas `enviar_mensagem` e `browser_search` ficam fora do catálogo: são nós próprios do workflow, existem em todos os planos e têm a referência escrita no nó *Build prompt*.) O modelo escolhe a ferramenta e a operação pela referência renderizada no prompt (`renderToolsReference`, que explica que tudo passa por `executar_ferramenta` com `data` como JSON em texto). A precisão vem dessa referência detalhada e do feedback de validação do backend. `data` vai sempre como string JSON porque o tipo `json` do `$fromAI` rejeita objetos vazios, e várias operações não têm parâmetros.
 
 No backend, a chamada chega em `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool, operation, data }` (`ExecuteToolDto`; `data` objeto ou string, parseado por `ExecuteOperationDto` com `@Transform`, e uma string inválida produz um `400` legível pelo modelo). `AssistantToolDispatcherService`:
 
@@ -334,6 +352,8 @@ Cada módulo de domínio é dono do handler da sua ferramenta: uma classe que im
 
 Do prompt, as que mais influenciam a experiência:
 
+- Tudo que o usuário lê sai por `enviar_mensagem` (seção "# Como você fala com o usuário" da diretiva): nunca encerrar sem ter enviado ao menos uma mensagem, no máximo 3 por pedido, e um aviso curto antes de uma etapa demorada só quando a resposta vem em seguida. O texto final do agente é apenas "ok" e não é entregue a ninguém.
+- Uma fala marcada com `tipo="audio"` é a transcrição de um áudio: tratar como fala normal, tolerar erros de transcrição e só pedir para repetir quando estiver incompreensível.
 - Cumprimento é cumprimento, não texto para analisar. O primeiro exemplo do prompt é exatamente `bom dia`.
 - Um pedido claro de ação é autorização suficiente. Confirmação só antes de excluir ou quando há ambiguidade real.
 - Se faltar um campo obrigatório, **não chama a ferramenta**: faz uma única pergunta objetiva.
@@ -605,7 +625,8 @@ O modelo recebe texto do usuário e pode chamar ferramentas. Mitigações:
 - **Plano checado no backend.** Além de o catálogo enviado ao n8n já vir filtrado pelo plano, o dispatcher refaz a checagem a cada execução: ferramenta fora do plano ou operação de outra ferramenta respondem `unsupported_operation`.
 - **Escape do histórico.** `<` e `>` viram `‹` e `›` antes de entrar no prompt; instruções injetadas ficam dentro de uma tag de mensagem e não conseguem escapar dela.
 - **Validação estrita.** `forbidNonWhitelisted` rejeita qualquer campo inventado; enums são fechados; ids precisam ser UUID.
-- **Limite de iterações** (8) e temperatura baixa (0,2).
+- **Limite de iterações** (12) e temperatura baixa (0,2).
+- **Envio só para o dono da run.** `enviar_mensagem` leva apenas o `content` (até 4096 caracteres); o destinatário é o `jid` do perfil da run, nunca um número escolhido pelo modelo.
 - **Sem operações destrutivas em massa** expostas (o `apply-all` do Securo, por exemplo).
 
 ### 12.4 Transporte e CORS
@@ -625,7 +646,7 @@ TLS terminado no Traefik. CORS aceita exatamente `WEB_ORIGIN` com `credentials: 
 | `user`, `session`, `account`, `verification` | better-auth | Esquema do better-auth mapeado no Prisma. `account.password` guarda o hash para o provedor de credenciais. |
 | `profiles` | Jarvis | Pivô do domínio. `userId` é `unique` e **nullable** para permitir perfis criados por seed (sem usuário web). `token` e `jid` são `unique`. `about` alimenta o prompt. `timezone` é IANA. |
 | `subscriptions` | Jarvis | `price Decimal(10,2)`, `limit Int`. |
-| `messages` | Jarvis | `userId` (na verdade `profile.id`) indexado, sem FK. `runId` opcional e indexado, FK para `assistant_runs` com `onDelete: SetNull`. Só as 10 últimas são lidas por mensagem; a tabela cresce linearmente com o uso. |
+| `messages` | Jarvis | `userId` (na verdade `profile.id`) indexado, sem FK. `runId` opcional e indexado, FK para `assistant_runs` com `onDelete: SetNull`. `type` (`user` \| `AI`) é o autor; `contentType` (`TEXT` \| `AUDIO`, padrão `TEXT`) diz como o conteúdo chegou, e em `AUDIO` o `content` é a transcrição. Só as 10 últimas são lidas por mensagem; a tabela cresce linearmente com o uso. |
 | `assistant_runs` | Jarvis | Um processamento de mensagem recebida (seção 5.3): `profileId` (FK, `onDelete: Cascade`), `waMessageId` (o `key.id` do Baileys), `status: PROCESSING \| COMPLETED \| FAILED`, `error`, `startedAt`, `finishedAt`. `@@unique([profileId, waMessageId])` é a guarda de idempotência; índice `(status, startedAt)`. |
 | `event_series`, `event_executions` | Jarvis | Ver seção 9. `onDelete: Cascade` a partir do perfil. Índice composto `(status, scheduledAt)` serve a query de janela do scheduler. |
 | `securo_accounts` | Jarvis | 1:1 com o perfil. Guarda ids do Securo e estado do provisioning. |
@@ -708,7 +729,7 @@ O modo privacidade (`privacy-context`) oculta valores monetários na tela inteir
 
 ### 16.2 Logs e sinais
 
-- `Logger` do Nest por classe. O loop de mensagens loga em `debug` a resposta do workflow de cada run e em `warn` as mensagens duplicadas ignoradas.
+- `Logger` do Nest por classe. O loop de mensagens loga em `warn` as mensagens duplicadas ignoradas e as runs que terminaram sem nenhuma mensagem ao usuário (quando o backend envia o aviso padrão).
 - `event_executions.observabilitys`, `securo_accounts.observabilitys` e `assistant_runs.error` guardam o motivo da última falha **no próprio registro**, o que permite diagnosticar sem procurar em logs.
 - `GET /whatsapp/status` para healthcheck do socket.
 - O n8n mantém o histórico de execuções do agente com prompt, tool calls e respostas.
@@ -719,7 +740,8 @@ O modo privacidade (`privacy-context`) oculta valores monetários na tela inteir
 |---|---|
 | Server reinicia | Socket reconecta com as credenciais do banco; cache do scheduler é reconstruído no próximo tick; eventos vencidos durante a queda são enviados no primeiro tick (recorrências pulam para a próxima ocorrência futura). |
 | WhatsApp desconecta | Reconexão automática após 3 s; `loggedOut` limpa as credenciais e gera QR novo. Envios nesse intervalo falham com `503` (eventos ficam `FAILED`). |
-| n8n fora do ar | Mensagem não respondida; a mensagem do usuário fica gravada e a run fica `FAILED` com o motivo. |
+| n8n fora do ar | A mensagem do usuário fica gravada, a run fica `FAILED` com o motivo e o usuário recebe o aviso padrão de falha (se o WhatsApp estiver conectado). |
+| Groq fora do ar | Mensagens de texto seguem normalmente no backend; um áudio não é transcrito, a run fica `FAILED` e o usuário recebe o aviso para reenviar ou escrever. |
 | Securo fora do ar | Operações financeiras retornam erro legível; provisioning marca `FAILED` e reprovisiona depois. |
 | Redis fora do ar | Boot falha (dependência dura). Em runtime, scheduler e finanças lançam; loop de mensagens sem finanças continua. |
 
@@ -736,7 +758,8 @@ Testes unitários com Jest 30 e ts-jest, colocados em `tests/` dentro de cada m�
 | `events.schedule.spec` | Repopulação e uso do cache, claim, transições de estado, `FAILED` com motivo, criação da próxima ocorrência, tolerância a `P2002`. |
 | `build-system-prompt.spec` | Contexto temporal com offset, fallback de fuso, todas as ferramentas e operações renderizadas, instrução de usar `executar_ferramenta`, seções da diretiva sem repetição, todos os códigos de erro do filtro M2M documentados. |
 | `main.tools.spec` | Forma do catálogo; nomes de ferramenta e de operação únicos. |
-| `assistant-main.service.spec`, `assistant-run.service.spec` | Sem perfil não abre run; reentrega ignorada sem chamar o n8n (`P2002`); só `{ runId }` vai ao n8n; `COMPLETED` no sucesso, `FAILED` com motivo limitado no erro; `findActive` recusa run inexistente ou finalizada. |
+| `assistant-main.service.spec`, `assistant-run.service.spec` | Sem perfil não abre run; reentrega ignorada sem chamar o n8n (`P2002`); só `{ runId }` vai ao n8n; `COMPLETED` no sucesso, `FAILED` com motivo limitado no erro; aviso padrão quando a run não enviou nada; `complete` e `fail` idempotentes; `findActive` recusa run inexistente ou finalizada. |
+| `assistant-message.service.spec`, `assistant-audio.service.spec`, `groq-transcription.provider.spec` | Envio pelo WhatsApp do perfil da run e gravação da mensagem `AI` só depois de entregue; várias mensagens na mesma run; `409` sem WhatsApp pareado; áudio longo recusado sem download e áudio grande sem transcrição; transcrição vazia tratada como falha; upload multipart ao Whisper e `GROQ_API_KEY` obrigatória. |
 | `assistant-tool-dispatcher.service.spec`, `assistant-tool-registry.service.spec` | Handler chamado com o perfil da run; ferramenta fora do plano e operação de outra ferramenta recusadas; boot falha sem handler ou com handler duplicado; descoberta por `@AssistantToolHandlerFor`. |
 | `finance-tool.service.spec`, `database-information-tool.service.spec` | Roteamento das operações para os services, validação de ids, operação desconhecida. |
 | 7 suítes de finanças | Tradução DTO → Securo por área (conta padrão, dinheiro como string, snake_case, `PATCH` parcial, defaults). |
@@ -809,6 +832,12 @@ Formato ADR resumido: contexto, decisão, consequências.
 **Decisão.** Cada mensagem que passa da triagem abre uma `AssistantRun` com `@@unique([profileId, waMessageId])`. O webhook recebe só `{ runId }`; o n8n lê contexto e ferramentas de `/assistant-m2m/runs/:runId/*` e executa tudo pelo mesmo `runId`, que só vale enquanto a run está `PROCESSING`. Sem retries.
 **Consequências.** Reentregas são descartadas no `INSERT`; contexto e ferramentas mudam sem mexer no workflow; o perfil nunca sai do backend e um `runId` antigo não dá acesso a nada. O custo: dois `GET` a mais por mensagem, e uma run presa em `PROCESSING` (o processo caiu no meio) deixa a mensagem sem resposta, de propósito, porque reprocessar poderia repetir uma ação.
 
+### ADR-10 · O agente fala por ferramenta; o webhook só encerra a run
+
+**Contexto.** O webhook do n8n devolvia `{ response }` e o backend enviava esse texto único ao final. O usuário ficava sem sinal durante etapas demoradas (busca na web, leitura das bases) e só cabia uma mensagem por pedido.
+**Decisão.** Toda mensagem ao usuário é uma chamada da ferramenta direta `enviar_mensagem` a `POST /assistant-m2m/runs/:runId/messages`, durante a run; o backend entrega no WhatsApp e só então grava a mensagem `AI`. O webhook responde apenas `{ status: "COMPLETED" }`, o texto final do agente é descartado e os nós *Simple Memory* e *Format response* saíram do workflow.
+**Consequências.** O agente pode avisar antes de uma etapa lenta e mandar mais de uma mensagem; o histórico só tem o que foi realmente entregue, e ele é a única memória do agente. O custo: uma chamada de ferramenta a mais por resposta (o limite de iterações subiu de 8 para 12), um modelo que esquece de chamar a ferramenta não responde (coberto pelo aviso padrão do backend quando a run termina ou falha sem nenhuma mensagem), e backend e workflow precisam subir juntos, porque o contrato da resposta do webhook mudou.
+
 ---
 
 ## 19. Limitações conhecidas e evolução
@@ -818,7 +847,7 @@ Formato ADR resumido: contexto, decisão, consequências.
 | Sem retentativa no scheduler | Falha de envio é final para aquela ocorrência. | Fila com backoff (BullMQ) ou retry no tick seguinte para `FAILED` recentes. |
 | Limite do plano não aplicado | Free Tier de 100 mensagens/mês é só informativo. | Contador por perfil e mês (Redis ou coluna), verificação no loop de mensagens, resposta amigável ao exceder. |
 | Reset de senha só loga o link | Usuário não recebe e-mail. | Provedor transacional (Resend, SES) no `sendResetPassword`. |
-| Só texto | Áudio, imagem e documentos não são interpretados. | Transcrição de áudio (Whisper via Groq) antes do loop; visão para comprovantes. |
+| Só texto e áudio | Imagem e documentos não são interpretados (só a legenda). Áudios acima de 10 minutos ou 24 MB são recusados com um aviso. | Visão para comprovantes. |
 | Uma instância | Sem alta disponibilidade. | Ver ADR-6. |
 | Run presa em `PROCESSING` | Se o processo cair no meio de uma mensagem, a run nunca termina e a mensagem fica sem resposta (não há reprocessamento, para não repetir ações). | Job que marca `FAILED` as runs `PROCESSING` antigas (o índice `(status, startedAt)` já serve essa query) e, se fizer sentido, avisa o usuário. |
 | Securo parcialmente exposto | Transferências, orçamentos e importação de extrato não são ferramentas. | Novos `case` no `FinanceToolService` + entradas no catálogo. |
@@ -838,7 +867,8 @@ Formato ADR resumido: contexto, decisão, consequências.
 | **RPC (`execute`)** | Endpoint único `POST /assistant-m2m/runs/:runId/tools/execute`, que recebe `{ tool, operation, data }` e delega ao handler da ferramenta. |
 | **Catálogo de tools (`ASSISTANT_TOOLS`)** | Declaração tipada do que o agente pode fazer, renderizada no prompt. |
 | **Directive** | Prompt estático (`DEFAULT_DIRECTIVE`), devolvido pelo endpoint de contexto da run; a referência de ferramentas vem à parte, do endpoint de tools. |
-| **`executar_ferramenta`** | O único nó de ferramenta do n8n; recebe `tool`, `operation` e `data` e chama o endpoint de execução. |
+| **`executar_ferramenta`** | O nó de ferramenta genérico do n8n, por onde passa todo o catálogo; recebe `tool`, `operation` e `data` e chama o endpoint de execução. |
+| **`enviar_mensagem`** | Ferramenta direta do n8n (fora do catálogo, em todos os planos); recebe `content` e chama `POST /assistant-m2m/runs/:runId/messages`. Único caminho do agente até o usuário. |
 | **Série / Execução** | Regra de um evento / um disparo concreto com estado. |
 | **Janela do scheduler** | 2 horas de execuções pendentes cacheadas no Redis. |
 | **Securo** | Gestor financeiro open source vendorizado como motor interno. |

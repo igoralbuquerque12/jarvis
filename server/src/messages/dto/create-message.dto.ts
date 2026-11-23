@@ -1,4 +1,4 @@
-import { MessageType } from '@prisma/client';
+import { MessageContentType, MessageType } from '@prisma/client';
 import {
   IsEnum,
   IsNotEmpty,
@@ -18,6 +18,11 @@ export class CreateMessageDto {
 
   @IsEnum(MessageType)
   type: MessageType;
+
+  /** How the content arrived. Defaults to TEXT; AUDIO is a transcription. */
+  @IsOptional()
+  @IsEnum(MessageContentType)
+  contentType?: MessageContentType;
 
   /** Assistant run that produced (or received) the message. */
   @IsOptional()

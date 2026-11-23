@@ -96,7 +96,7 @@ O projeto é um monorepo com backend NestJS, frontend React, um workflow n8n ver
 | **WhatsApp** | Canal principal. O Jarvis se conecta como um cliente WhatsApp Web via [Baileys](https://github.com/WhiskeySockets/Baileys). Não há chat na web. |
 | **Jarvis Core / API** | Backend NestJS: recebe mensagens, resolve o perfil, monta o contexto, persiste histórico, executa ferramentas, agenda envios, expõe a API web e a API pública. |
 | **Web app** | React 19 + Vite. Login, dashboard, finanças, perfil, planos, chaves de API e documentação da API. |
-| **n8n + LLM** | Orquestra o agente: valida o payload, monta o prompt, roda o modelo com function calling e devolve uma resposta em texto. |
+| **n8n + LLM** | Orquestra o agente: valida o payload, monta o prompt, roda o modelo com function calling e envia cada mensagem ao usuário pela ferramenta `enviar_mensagem` (o webhook só devolve o status da run). |
 | **Securo** | Motor financeiro invisível para o usuário. FastAPI + Postgres + Celery, rodando na rede interna. |
 | **PostgreSQL + pgvector** | Banco do Jarvis (serviço `postgres` do compose): usuários, perfis, mensagens, eventos, chaves, credenciais do WhatsApp e os trechos indexados das bases de conhecimento. Sem backup automático. |
 | **Redis** | Cache do scheduler de eventos e dos tokens do Securo. Também é o broker do Celery do Securo (database 1). |
@@ -146,12 +146,13 @@ O `Profile` é o pivô de tudo. Ele é criado por um hook do better-auth no cada
   <img src="diagrams/03-message-flow.svg" alt="Diagrama de sequência do processamento de uma mensagem do WhatsApp" width="100%">
 </p>
 
-1. O socket Baileys emite `messages.upsert`. O receiver só aceita `type === 'notify'` (mensagens novas, não histórico) e descarta mensagens enviadas pelo próprio número ou sem texto.
+1. O socket Baileys emite `messages.upsert`. O receiver só aceita `type === 'notify'` (mensagens novas, não histórico) e descarta mensagens enviadas pelo próprio número. Texto (ou legenda de mídia) segue como está; um áudio (nota de voz ou arquivo) segue com um download preguiçoso, sem baixar nada ainda.
 2. `AssistantMainService` procura um `Profile` pelo `jid`. **Sem perfil**, o serviço de conexão procura um token de 10 caracteres na mensagem e, se encontrar, pareia a conta. Esse é todo o onboarding.
-3. **Com perfil**, abre uma *run* (`assistant_runs`, única por perfil + id da mensagem no WhatsApp: uma reentrega é ignorada sem chamar o n8n) e persiste a mensagem atual ligada a ela.
+3. **Com perfil**, abre uma *run* (`assistant_runs`, única por perfil + id da mensagem no WhatsApp: uma reentrega é ignorada sem chamar o n8n) e persiste a mensagem atual ligada a ela. Se for áudio, só agora ele é baixado e transcrito (Whisper na Groq, até 10 minutos / 24 MB) e a transcrição é gravada como a mensagem do usuário, com `contentType = AUDIO`; se a transcrição falhar, a run fica `FAILED` e o usuário recebe um aviso pedindo para reenviar ou escrever.
 4. O backend faz `POST` no webhook do n8n, autenticado por `x-api-key`, enviando **apenas `{ runId }`**.
-5. O n8n busca pelo `runId` o contexto (`GET /assistant-m2m/runs/:runId/context`: diretiva, `about` do perfil, mensagem atual, as 10 anteriores, índice das bases de conhecimento e data/hora no fuso do usuário) e as ferramentas do plano (`GET /assistant-m2m/runs/:runId/tools`), monta o prompt com blocos XML e roda o **AI Agent** (até 8 iterações). A cada tool call, a ferramenta única `executar_ferramenta` chama `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool, operation, data }`. Um `400` de validação volta para o modelo como texto e ele corrige os argumentos.
-6. A resposta `{ response }` é validada com Zod, persistida como mensagem do tipo `AI`, enviada de volta pelo mesmo socket, e a run é marcada `COMPLETED` (ou `FAILED`, com o motivo, se algo der errado).
+5. O n8n busca pelo `runId` o contexto (`GET /assistant-m2m/runs/:runId/context`: diretiva, `about` do perfil, mensagem atual e o tipo dela (`TEXT` ou `AUDIO`), as 10 anteriores, índice das bases de conhecimento e data/hora no fuso do usuário) e as ferramentas do plano (`GET /assistant-m2m/runs/:runId/tools`), monta o prompt com blocos XML e roda o **AI Agent** (até 12 iterações). A cada tool call do catálogo, a ferramenta genérica `executar_ferramenta` chama `POST /assistant-m2m/runs/:runId/tools/execute` com `{ tool, operation, data }`. Um `400` de validação volta para o modelo como texto e ele corrige os argumentos.
+6. O agente fala com o usuário **durante** a run, pela ferramenta direta `enviar_mensagem`: cada chamada faz `POST /assistant-m2m/runs/:runId/messages` com `{ content }`, e o backend envia o texto pelo mesmo socket e só então o persiste como mensagem do tipo `AI`. Uma run pode enviar mais de uma mensagem (um "só um minuto" antes de uma busca e, depois, o resultado). O texto final do agente é descartado.
+7. O webhook responde apenas `{ "status": "COMPLETED" }`, validado com Zod, e a run é marcada `COMPLETED` (ou `FAILED`, com o motivo, se algo der errado). Se a run terminar, ou falhar, sem nenhuma mensagem enviada, o próprio backend manda um aviso padrão para o usuário não ficar sem resposta.
 
 O diagrama de onboarding e os detalhes de cada etapa estão no [documento de arquitetura](ARCHITECTURE.md).
 
@@ -168,7 +169,7 @@ O diagrama de onboarding e os detalhes de cada etapa estão no [documento de arq
 | Autenticação | **better-auth 1.6** | E-mail/senha e Google. Montado fora do pipeline do Nest. |
 | Validação | class-validator / class-transformer (DTOs internos), **Zod 4** (payloads externos) | Os dois padrões coexistem de propósito. |
 | Datas | **Luxon** | Toda conta de data é feita no fuso IANA do perfil e gravada em UTC. |
-| IA | **n8n** (AI Agent + `httpRequestTool`), **Groq** `openai/gpt-oss-120b` | Workflow versionado em [`n8n.json`](../n8n.json). |
+| IA | **n8n** (AI Agent + `httpRequestTool`), **Groq** `openai/gpt-oss-120b` | Workflow versionado em [`n8n.json`](../n8n.json). Os áudios são transcritos no backend com `whisper-large-v3-turbo` (Groq). |
 | Finanças | **Securo** (FastAPI, SQLAlchemy, Celery, Postgres 16 + pgvector) | Vendorizado em `securo/`. |
 | Frontend | **React 19**, **Vite 8**, React Router 7, Recharts 3 | Sem UI kit: design system próprio em CSS (tokens, Michroma/Orbitron/Space Grotesk). |
 | Infra | **Docker Compose**, **Traefik** (TLS Let's Encrypt), nginx | Multi-stage builds, imagem final roda como usuário `node`. |
@@ -231,7 +232,7 @@ Convenções: módulos seguem `controllers/ services/ dto/ entities/ utils/ sche
 - **Docker** com Compose v2
 - O **PostgreSQL com pgvector** do Jarvis vem no compose (serviço `postgres`): defina `JARVIS_DB_PASSWORD` no `.env` da raiz e rode `docker compose up -d postgres`. Ele publica a porta só em `127.0.0.1:5432`, para o backend rodando fora do Docker.
 - Uma **chave da OpenAI** (`OPENAI_API_KEY`), obrigatória para os embeddings das bases de conhecimento.
-- Uma **conta Groq** (ou outro provedor com function calling) para o modelo.
+- Uma **conta Groq**: a credencial do modelo no n8n (ali pode ser outro provedor com function calling) e a `GROQ_API_KEY` do backend, obrigatória para transcrever os áudios recebidos no WhatsApp.
 - Um **número de WhatsApp dedicado** ao assistente, num celular onde você consiga escanear um QR code.
 
 ### 1. Suba a infraestrutura de apoio (Redis + Securo)
@@ -296,7 +297,7 @@ docker run -d --name n8n -p 127.0.0.1:5678:5678 \
 Em `http://localhost:5678`:
 
 1. Importe [`n8n.json`](../n8n.json).
-2. Crie a credencial **Groq** e a credencial **Header Auth** com o header `x-api-key` e o valor de `ASSISTANT_WORKFLOW_KEY`. A mesma credencial serve para o webhook (o backend envia essa chave) e para os nós *Get context*, *Get tools* e `executar_ferramenta` (os endpoints `/assistant-m2m/*` validam com ela).
+2. Crie a credencial **Groq** e a credencial **Header Auth** com o header `x-api-key` e o valor de `ASSISTANT_WORKFLOW_KEY`. A mesma credencial serve para o webhook (o backend envia essa chave) e para os nós *Get context*, *Get tools*, `executar_ferramenta` e `enviar_mensagem` (os endpoints `/assistant-m2m/*` validam com ela).
 3. No nó *Config*, aponte `baseUrl` para `http://host.docker.internal:3000` (dev local) ou `http://server:3000` (rede interna).
 4. Ative o workflow. O nó Webhook expõe o caminho `assistant`, então no `server/.env`:
 
@@ -359,8 +360,9 @@ node docs/diagrams/render.mjs            # re-renderiza os diagramas desta docum
 | `ASSISTANT_WORKFLOW_KEY` | **sim** | Enviada como `x-api-key` para o webhook e exigida nos endpoints que o n8n chama (`/assistant-m2m/*`). Deve bater com a credencial Header Auth do n8n. |
 | `AI_EXTRACTION_PROVIDER` | não (padrão `openai`) | Provedor da extração de nome e descrição das bases: `openai` ou `groq`. Substitui `AI_PROVIDER`, que agora derruba o boot. |
 | `AI_EMBEDDING_PROVIDER` | não (padrão `openai`) | Provedor dos embeddings do RAG das bases. Só `openai`. |
+| `AI_TRANSCRIPTION_PROVIDER` | não (padrão `groq`) | Provedor da transcrição dos áudios recebidos no WhatsApp. Só `groq`. |
 | `OPENAI_API_KEY` | **sim** | Sempre obrigatória (embeddings). Sem ela o servidor não sobe. |
-| `GROQ_API_KEY` | só com `AI_EXTRACTION_PROVIDER=groq` | Chave da Groq para a extração. |
+| `GROQ_API_KEY` | **sim** | Sempre obrigatória (transcrição de áudio); também usada na extração com `AI_EXTRACTION_PROVIDER=groq`. Sem ela o servidor não sobe. |
 | `SECURO_API_URL` | **sim** | `http://localhost:8000` em dev. O compose injeta `http://securo-backend:8000`. |
 | `SECURO_ADMIN_EMAIL` / `SECURO_ADMIN_PASSWORD` | **sim** | Usuário de serviço do Securo, criado automaticamente no primeiro boot. |
 | `SECURO_PROVISION_SECRET` | **sim** | Deriva a senha de cada perfil no Securo. **Não trocar depois de provisionar usuários.** |
@@ -411,7 +413,7 @@ As suítes unitárias cobrem:
 | Área | Suítes | O que garantem |
 |---|---|---|
 | Eventos | `get-next-scheduled-at`, `events-m2m.service`, `events.schedule` | Arredondamento para 10 min (empate arredonda para frente), próxima ocorrência sempre no futuro e no fuso certo, validação de recorrência, claim/estados do scheduler, invalidação do cache. |
-| Assistente | `main.tools`, `build-system-prompt`, `assistant-main.service`, `assistant-run.service`, `assistant-tool-dispatcher.service`, `assistant-tool-registry.service` | Forma do catálogo de tools (nomes únicos), renderização da referência de ferramentas, contexto temporal com offset, idempotência e estados da run, checagem de plano a cada execução, boot falhando sem handler. |
+| Assistente | `main.tools`, `build-system-prompt`, `assistant-main.service`, `assistant-run.service`, `assistant-message.service`, `assistant-audio.service`, `assistant-tool-dispatcher.service`, `assistant-tool-registry.service` | Forma do catálogo de tools (nomes únicos), renderização da referência de ferramentas, contexto temporal com offset, idempotência e estados da run, envio de mensagens durante a run e aviso padrão quando nada foi enviado, limites e falhas da transcrição de áudio, checagem de plano a cada execução, boot falhando sem handler. |
 | Finanças | 7 suítes de domínio + `securo-provisioning.service` | Tradução DTO → payload do Securo (dinheiro como string, snake_case, PATCH só com campos enviados, defaults BRL), curto-circuito de conta ativa, fluxo completo de provisioning, marcação `FAILED`, cache de token. |
 | Chaves de API | `generate-api-key`, `extract-api-key`, `api-keys.service`, `api-key.guard` | Formato `jrv_`, hash, limite por perfil, recusa de chave inativa/perfil inativo, `lastUsedAt` best-effort. |
 | API pública | `public-api.service` | `409` quando o perfil não pareou o WhatsApp. |
@@ -460,9 +462,9 @@ A rota age sempre em nome do dono da chave: envia a mensagem para o WhatsApp del
 - **Limite do plano ainda não é aplicado**: o `Subscription.limit` (100 mensagens/mês no Free Tier) existe no modelo e na UI, mas não há contagem nem bloqueio.
 - **Reset de senha só loga o link**: o `sendResetPassword` do better-auth escreve a URL no log do servidor; não há provedor de e-mail configurado.
 - **Uma instância do backend**: a sessão Baileys é única e o scheduler assume um único processo. Escalar horizontalmente exigiria extrair o gateway de WhatsApp e adotar lock distribuído no cron.
-- **Só texto**: legendas de mídia são lidas, mas áudio, imagem e documentos não são interpretados.
+- **Só texto e áudio**: legendas de mídia são lidas e áudios de até 10 minutos são transcritos, mas imagem e documentos não são interpretados.
 - **Securo parcialmente exposto**: transferências entre contas, orçamentos e importação de extratos existem no Securo e ainda não viraram ferramentas.
-- **Próximos passos naturais**: fila com retry para envios, contagem de uso por plano, e-mail transacional, transcrição de áudio, testes e2e cobrindo os endpoints M2M.
+- **Próximos passos naturais**: fila com retry para envios, contagem de uso por plano, e-mail transacional, testes e2e cobrindo os endpoints M2M.
 
 ---
 

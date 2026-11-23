@@ -15,10 +15,14 @@ import { AssistantRunService } from './services/assistant-run.service';
 import { AssistantContextService } from './services/assistant-context.service';
 import { AssistantToolRegistry } from './services/assistant-tool-registry.service';
 import { AssistantToolDispatcherService } from './services/assistant-tool-dispatcher.service';
+import { AssistantMessageService } from './services/assistant-message.service';
+import { AssistantAudioService } from './services/assistant-audio.service';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
     DiscoveryModule,
+    AiModule,
     forwardRef(() => ProfileModule),
     MessagesModule,
     DatabaseInformationModule,
@@ -35,6 +39,8 @@ import { AssistantToolDispatcherService } from './services/assistant-tool-dispat
     AssistantContextService,
     AssistantToolRegistry,
     AssistantToolDispatcherService,
+    AssistantMessageService,
+    AssistantAudioService,
   ],
   exports: [AssistantMainService],
 })

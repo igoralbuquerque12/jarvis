@@ -16,7 +16,8 @@ export type ActiveAssistantRun = AssistantRun & { profile: Profile };
 /**
  * Lifecycle of an assistant run: one per inbound WhatsApp message that passed
  * triage. `PROCESSING → COMPLETED | FAILED`, no retries. The runId is what n8n
- * receives; it only grants access while the run is still PROCESSING.
+ * receives; it only grants access while the run is still PROCESSING. n8n never
+ * returns text: it sends messages during the run and its answer only closes it.
  */
 @Injectable()
 export class AssistantRunService {
@@ -43,22 +44,32 @@ export class AssistantRunService {
     }
   }
 
-  complete(runId: string) {
-    return this.prisma.assistantRun.update({
-      where: { id: runId },
+  /**
+   * Closes the run once n8n answered that the workflow ran to the end.
+   * Idempotent: only a PROCESSING run changes, so closing twice (or closing a
+   * run that already failed) is a no-op. Returns whether this call closed it.
+   */
+  async complete(runId: string): Promise<boolean> {
+    const { count } = await this.prisma.assistantRun.updateMany({
+      where: { id: runId, status: AssistantRunStatus.PROCESSING },
       data: { status: AssistantRunStatus.COMPLETED, finishedAt: new Date() },
     });
+
+    return count > 0;
   }
 
-  fail(runId: string, reason: string) {
-    return this.prisma.assistantRun.update({
-      where: { id: runId },
+  /** Same idempotency as `complete`: a finished run keeps its status. */
+  async fail(runId: string, reason: string): Promise<boolean> {
+    const { count } = await this.prisma.assistantRun.updateMany({
+      where: { id: runId, status: AssistantRunStatus.PROCESSING },
       data: {
         status: AssistantRunStatus.FAILED,
         error: reason.slice(0, MAX_ERROR_LENGTH),
         finishedAt: new Date(),
       },
     });
+
+    return count > 0;
   }
 
   /**

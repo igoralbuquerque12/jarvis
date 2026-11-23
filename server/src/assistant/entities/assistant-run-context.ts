@@ -1,11 +1,11 @@
-import type { Message } from '@prisma/client';
+import type { Message, MessageContentType } from '@prisma/client';
 import type { KnowledgeIndexItem } from '../../database-information/entities/database-information-assistant.view';
 import type { CachedAssistantEvent } from '../../events/types/event-execution.types';
 import type { AssistantTool } from '../tools/tool.types';
 
 export type WorkflowHistoryMessage = Pick<
   Message,
-  'type' | 'content' | 'createdAt'
+  'type' | 'contentType' | 'content' | 'createdAt'
 >;
 
 /** `GET /assistant-m2m/runs/:runId/context`. */
@@ -17,6 +17,11 @@ export interface AssistantRunContext {
   /** Opaque per-profile session key used by n8n memory without exposing profileId. */
   sessionKey: string;
   currentMessage: string;
+  /**
+   * How the current message arrived. `AUDIO` means `currentMessage` is the
+   * automatic transcription of a voice message (it may carry mishearings).
+   */
+  currentMessageType: MessageContentType;
   /** Messages before the current one, newest first. */
   lastMessages: WorkflowHistoryMessage[];
   /**

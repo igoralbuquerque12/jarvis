@@ -1,13 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MessageType } from '@prisma/client';
+import { MessageContentType, MessageType } from '@prisma/client';
+import type { Profile } from '@prisma/client';
 
 import { IncomingMessageDto } from '../dto/receive-message.dto';
 import { ProfileService } from '../../profile/services/profile.service';
 import { MessagesService } from '../../messages/services/messages.service';
 import { AssistantWorkflowService } from './assistant-workflow.service';
-import { WhatsappSenderService } from '../../whatsapp/services/whatsapp-sender.service';
 import { AssistantConnectionService } from './assistant-connection.service';
 import { AssistantRunService } from './assistant-run.service';
+import { AssistantMessageService } from './assistant-message.service';
+import { AssistantAudioService } from './assistant-audio.service';
+import { AssistantAudioError } from '../errors/assistant-audio.error';
+import { ASSISTANT_FALLBACK_REPLY } from '../constants/assistant-message.constant';
 
 @Injectable()
 export class AssistantMainService {
@@ -17,19 +21,21 @@ export class AssistantMainService {
     private readonly profileService: ProfileService,
     private readonly messagesService: MessagesService,
     private readonly assistantWorkflowService: AssistantWorkflowService,
-    private readonly whatsappSenderService: WhatsappSenderService,
     private readonly assistantConnectionService: AssistantConnectionService,
     private readonly assistantRunService: AssistantRunService,
+    private readonly assistantMessageService: AssistantMessageService,
+    private readonly assistantAudioService: AssistantAudioService,
   ) {}
 
   async receiveMessage(data: IncomingMessageDto) {
     let runId: string | null = null;
+    let profile: Profile | null = null;
 
     try {
       // toDo: validar campos possívelmente ausentes que o dto era pra ter validado mas a gente ta forçando a passagem no modulo do wpp. O modulo do wpp não tem obrigação de verificar, ele só passa.
       const currentMessage = data.text || '';
 
-      const profile = await this.profileService.findOne({ jid: data.from });
+      profile = await this.profileService.findOne({ jid: data.from });
       if (!profile) {
         const connectionSuccess =
           await this.assistantConnectionService.connectionAttempt(
@@ -65,32 +71,32 @@ export class AssistantMainService {
       }
       runId = run.id;
 
+      const content = data.audio
+        ? await this.assistantAudioService.transcribe(data.audio)
+        : currentMessage;
+
       await this.messagesService.create({
         userId: profile.id,
-        content: currentMessage,
+        content,
         type: MessageType.user,
+        contentType: data.audio
+          ? MessageContentType.AUDIO
+          : MessageContentType.TEXT,
         runId,
       });
 
-      // n8n reads context and tools back from /assistant-m2m/runs/:runId/*.
-      const responseWorkflow = await this.assistantWorkflowService.fetch({
-        runId,
-      });
-      this.logger.debug(
-        `Workflow response for run ${runId}: ${responseWorkflow.response}`,
-      );
+      await this.assistantWorkflowService.fetch({ runId });
 
-      await this.messagesService.create({
-        userId: profile.id,
-        content: responseWorkflow.response,
-        type: MessageType.AI,
-        runId,
-      });
-
-      await this.whatsappSenderService.sendMessage(
-        data.from,
-        responseWorkflow.response,
-      );
+      if (!(await this.assistantMessageService.hasReplied(runId))) {
+        this.logger.warn(
+          `Run ${runId} finished without any message to the user; sending the fallback reply.`,
+        );
+        await this.assistantMessageService.deliver(
+          profile,
+          runId,
+          ASSISTANT_FALLBACK_REPLY,
+        );
+      }
 
       await this.assistantRunService.complete(runId);
 
@@ -102,7 +108,7 @@ export class AssistantMainService {
       this.logger.error('Error in receiveMessage', error);
       const reason = error instanceof Error ? error.message : 'Unknown error';
 
-      if (runId) {
+      if (runId && profile) {
         await this.assistantRunService
           .fail(runId, reason)
           .catch((failError: unknown) =>
@@ -111,12 +117,39 @@ export class AssistantMainService {
               failError,
             ),
           );
+
+        await this.apologize(profile, runId, error);
       }
 
       return {
         ok: false,
         error: reason,
       };
+    }
+  }
+
+  /**
+   * Best effort: a failed run that never said anything still owes the user an
+   * answer. Skipped when the assistant already sent a message in the run.
+   */
+  private async apologize(profile: Profile, runId: string, error: unknown) {
+    try {
+      if (await this.assistantMessageService.hasReplied(runId)) {
+        return;
+      }
+
+      await this.assistantMessageService.deliver(
+        profile,
+        runId,
+        error instanceof AssistantAudioError
+          ? error.userMessage
+          : ASSISTANT_FALLBACK_REPLY,
+      );
+    } catch (replyError) {
+      this.logger.error(
+        `Could not send the fallback reply of run ${runId}`,
+        replyError,
+      );
     }
   }
 }

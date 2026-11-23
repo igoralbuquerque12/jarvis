@@ -2,6 +2,10 @@
 export const AI_BASE_PROVIDER = Symbol('AI_BASE_PROVIDER');
 /** DI token for the embeddings adapter picked by `AI_EMBEDDING_PROVIDER` (before retry). */
 export const AI_BASE_EMBEDDING_PROVIDER = Symbol('AI_BASE_EMBEDDING_PROVIDER');
+/** DI token for the speech-to-text adapter picked by `AI_TRANSCRIPTION_PROVIDER` (before retry). */
+export const AI_BASE_TRANSCRIPTION_PROVIDER = Symbol(
+  'AI_BASE_TRANSCRIPTION_PROVIDER',
+);
 
 /** Structured extraction (knowledge base name/description). */
 export const AI_EXTRACTION_PROVIDER_ENV = 'AI_EXTRACTION_PROVIDER';
@@ -17,6 +21,18 @@ export const AI_EMBEDDING_PROVIDER_NAMES = ['openai'] as const;
 export type AiEmbeddingProviderName =
   (typeof AI_EMBEDDING_PROVIDER_NAMES)[number];
 export const AI_DEFAULT_EMBEDDING_PROVIDER: AiEmbeddingProviderName = 'openai';
+
+/** Speech-to-text of the audios users send over WhatsApp. */
+export const AI_TRANSCRIPTION_PROVIDER_ENV = 'AI_TRANSCRIPTION_PROVIDER';
+export const AI_TRANSCRIPTION_PROVIDER_NAMES = ['groq'] as const;
+export type AiTranscriptionProviderName =
+  (typeof AI_TRANSCRIPTION_PROVIDER_NAMES)[number];
+export const AI_DEFAULT_TRANSCRIPTION_PROVIDER: AiTranscriptionProviderName =
+  'groq';
+/** ISO-639-1 hint sent to the speech-to-text model (the product is pt-BR). */
+export const AI_TRANSCRIPTION_LANGUAGE = 'pt';
+/** Audio uploads take longer than a JSON completion. */
+export const AI_TRANSCRIPTION_TIMEOUT_MS = 60_000;
 
 /** Old single variable, replaced by the two above. Refused on boot. */
 export const AI_LEGACY_PROVIDER_ENV = 'AI_PROVIDER';

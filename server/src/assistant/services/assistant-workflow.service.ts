@@ -11,6 +11,10 @@ import { ConfigService } from '@nestjs/config/dist/config.service';
 export class AssistantWorkflowService {
   constructor(private readonly configService: ConfigService) {}
 
+  /**
+   * Runs the n8n workflow for a run and resolves only when it answers
+   * `{ status: "COMPLETED" }`. A non-2xx or any other body throws.
+   */
   async fetch(
     payload: ReceiveMessageWorkflowInput,
   ): Promise<ReceiveMessageWorkflowOutput> {

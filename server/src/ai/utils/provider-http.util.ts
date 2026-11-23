@@ -7,13 +7,15 @@ export type ProviderPostRequest = {
   path: string;
   apiKey: string;
   timeoutMs: number;
-  body: Record<string, unknown>;
+  /** JSON payload, or a multipart form (file uploads such as audio). */
+  body: Record<string, unknown> | FormData;
 };
 
 const RETRYABLE_STATUSES = new Set([408, 409, 425, 429]);
 
 /**
- * POSTs JSON to an OpenAI-compatible endpoint and returns the parsed body.
+ * POSTs JSON (or multipart, when `body` is a `FormData`) to an
+ * OpenAI-compatible endpoint and returns the parsed body.
  * Every failure is mapped to `AiProviderError` with `retryable` set, so
  * callers never see vendor-specific errors.
  */
@@ -22,16 +24,19 @@ export async function postToProvider<T>(
 ): Promise<T> {
   const url = `${request.baseUrl.replace(/\/+$/, '')}${request.path}`;
 
+  // fetch sets the multipart boundary itself, so no Content-Type for forms.
+  const form = request.body instanceof FormData ? request.body : null;
+
   let response: Response;
 
   try {
     response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...(!form && { 'Content-Type': 'application/json' }),
         Authorization: `Bearer ${request.apiKey}`,
       },
-      body: JSON.stringify(request.body),
+      body: form ?? JSON.stringify(request.body),
       signal: AbortSignal.timeout(request.timeoutMs),
     });
   } catch (error) {

@@ -119,14 +119,15 @@ model Subscription {
 }
 
 model Message {
-  id        String        @id @default(uuid()) @db.Uuid
-  userId    String
-  content   String
-  type      MessageType
-  runId     String?       @db.Uuid
-  run       AssistantRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String
+  content     String
+  type        MessageType
+  contentType MessageContentType @default(TEXT)
+  runId       String?            @db.Uuid
+  run         AssistantRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([userId])
   @@index([runId])
@@ -161,6 +162,11 @@ enum AssistantRunStatus {
 enum MessageType {
   user
   AI
+}
+
+enum MessageContentType {
+  TEXT
+  AUDIO
 }
 
 model EventSeries {

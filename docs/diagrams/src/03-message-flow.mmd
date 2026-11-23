@@ -10,32 +10,44 @@ sequenceDiagram
   participant M as Endpoints M2M
   participant S as WhatsappSenderService
 
-  U->>B: mensagem de texto
+  U->>B: mensagem de texto ou áudio
   B->>R: messages.upsert (type = notify)
-  R->>R: ignora fromMe, sem texto e histórico (append)
-  R->>A: receiveMessage({ from: jid, text })
+  R->>R: ignora fromMe e histórico (append)
+  R->>A: receiveMessage({ from: jid, text, audio? })
   A->>DB: Profile.findUnique({ jid })
   alt jid desconhecido
     A->>A: procura um token de 10 caracteres na mensagem
     A->>DB: Profile.findFirst({ token }) e grava o jid
     A->>S: "sua conta foi conectada" (ou silêncio)
   else perfil encontrado
-    A->>DB: últimas 10 mensagens (histórico)
-    A->>DB: persiste a mensagem atual (type = user)
-    A->>N: POST webhook · x-api-key<br/>directive + catálogo, perfil, histórico, now/timezone
+    A->>DB: abre a run (PROCESSING)<br/>reentrega (P2002) é ignorada
+    opt áudio
+      A->>L: baixa o áudio e transcreve (Whisper)
+    end
+    A->>DB: persiste a mensagem atual (type = user)<br/>contentType = TEXT ou AUDIO
+    A->>N: POST webhook · x-api-key<br/>{ runId }
+    N->>M: GET /assistant-m2m/runs/:runId/context e /tools
     N->>N: Validate input → Build prompt (blocos XML)
-    loop até 8 iterações do agente
+    loop até 12 iterações do agente
       N->>L: system prompt + fala atual
-      L-->>N: texto final ou tool call
-      opt tool call
-        N->>M: POST /{events,finance}-m2m/:profileId/execute<br/>{ operation, data }
+      L-->>N: tool call ou fim
+      opt executar_ferramenta
+        N->>M: POST /assistant-m2m/runs/:runId/tools/execute<br/>{ tool, operation, data }
         M-->>N: resultado ou erro 400 legível (neverError)
       end
+      opt enviar_mensagem
+        N->>M: POST /assistant-m2m/runs/:runId/messages<br/>{ content }
+        M->>S: sendMessage(jid, content)
+        S->>B: socket.sendMessage
+        B-->>U: mensagem do Jarvis
+        M->>DB: persiste a mensagem (type = AI)
+        M-->>N: { sent: true }
+      end
     end
-    N-->>A: { response }
+    N-->>A: { status: "COMPLETED" }
     A->>A: valida com Zod
-    A->>DB: persiste a resposta (type = AI)
-    A->>S: sendMessage(jid, response)
-    S->>B: socket.sendMessage
-    B-->>U: resposta do Jarvis
+    opt nenhuma mensagem enviada na run
+      A->>S: aviso padrão de falha
+    end
+    A->>DB: fecha a run (COMPLETED ou FAILED)
   end

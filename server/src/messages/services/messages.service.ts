@@ -31,6 +31,13 @@ export class MessagesService {
     });
   }
 
+  /** How many messages the assistant already sent to the user in a run. */
+  countAiMessagesOfRun(runId: string) {
+    return this.prisma.message.count({
+      where: { runId, type: MessageType.AI },
+    });
+  }
+
   async findOne(id: string) {
     const message = await this.prisma.message.findUnique({ where: { id } });
 

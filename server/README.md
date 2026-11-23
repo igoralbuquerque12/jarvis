@@ -8,8 +8,8 @@ O server concentra o domínio e as integrações de backend:
 
 - autenticação web por sessão com better-auth;
 - perfis, assinaturas e pareamento de usuários com o WhatsApp;
-- recebimento e envio de mensagens com Baileys;
-- runs do assistente (uma por mensagem recebida, idempotentes), contexto e ferramentas servidos ao workflow n8n;
+- recebimento e envio de mensagens com Baileys, com transcrição dos áudios recebidos (Whisper na Groq);
+- runs do assistente (uma por mensagem recebida, idempotentes), contexto, ferramentas e envio de mensagens servidos ao workflow n8n;
 - eventos, recorrências e execução agendada de lembretes;
 - integração financeira com a API interna do Securo;
 - criação e validação de chaves `jrv_…`;
@@ -106,7 +106,8 @@ Use [`.env.example`](.env.example) como base.
 | `ASSISTANT_WORKFLOW_KEY` | Chave enviada pelo server ao webhook e exigida nos endpoints que o n8n chama (`/assistant-m2m`). |
 | `AI_EXTRACTION_PROVIDER` | Provedor da extração de nome e descrição das bases (`openai` ou `groq`, padrão `openai`). Substitui `AI_PROVIDER`, que agora derruba o boot. |
 | `AI_EMBEDDING_PROVIDER` | Provedor dos embeddings do RAG das bases (só `openai`). `OPENAI_API_KEY` é sempre obrigatória. |
-| `OPENAI_API_KEY`, `GROQ_API_KEY` | Chave do provedor escolhido; sem ela o server não sobe. |
+| `AI_TRANSCRIPTION_PROVIDER` | Provedor da transcrição dos áudios recebidos no WhatsApp (só `groq`, que é o padrão). `GROQ_API_KEY` é sempre obrigatória. |
+| `OPENAI_API_KEY`, `GROQ_API_KEY` | As duas são sempre obrigatórias (embeddings e transcrição de áudio); sem qualquer uma o server não sobe. |
 | `SECURO_API_URL` | Base da API interna do Securo. |
 | `SECURO_ADMIN_EMAIL`, `SECURO_ADMIN_PASSWORD` | Credenciais administrativas do Securo. |
 | `SECURO_PROVISION_SECRET` | Segredo para derivar as credenciais de cada perfil no Securo. |
@@ -125,7 +126,7 @@ O backend expõe quatro tipos de interface:
 | Administração | `x-admin-key` com `WHATSAPP_ADMIN_API_KEY` | `/whatsapp` |
 | Integrações externas | `Authorization: Bearer jrv_…` | `/v1` |
 
-Os endpoints com sessão nunca recebem o `profileId` do cliente; ele é obtido da sessão. As rotas do agente também não: recebem só o `runId`, o perfil vem da run (que só vale enquanto está `PROCESSING`), e são destinadas à rede interna. Todas as ferramentas do assistente passam por `POST /assistant-m2m/runs/:runId/tools/execute`.
+Os endpoints com sessão nunca recebem o `profileId` do cliente; ele é obtido da sessão. As rotas do agente também não: recebem só o `runId`, o perfil vem da run (que só vale enquanto está `PROCESSING`), e são destinadas à rede interna. Todas as ferramentas do catálogo do assistente passam por `POST /assistant-m2m/runs/:runId/tools/execute`, e toda mensagem do assistente ao usuário passa por `POST /assistant-m2m/runs/:runId/messages` (`{ content }`, de 1 a 4096 caracteres → `{ sent: true }`): o webhook do n8n não devolve texto, só `{ "status": "COMPLETED" }`.
 
 ## Banco e Prisma
 

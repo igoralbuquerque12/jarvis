@@ -70,16 +70,25 @@ describe('DEFAULT_DIRECTIVE', () => {
 
   it('contains the behaviour contract sections exactly once', () => {
     for (const section of [
+      '# Como você fala com o usuário',
       '# Fontes de verdade',
       '# Regras de operação',
       '# Ferramentas e erros',
       '# Autonomia e confirmação',
       '# Quando perguntar',
       '# Critérios de conclusão',
-      '# Formato da resposta',
+      '# Formato das mensagens',
     ]) {
       expect(directive.split(section).length - 1).toBe(1);
     }
+  });
+
+  it('makes enviar_mensagem the only way to talk to the user', () => {
+    expect(directive).toContain('enviar_mensagem');
+    expect(directive).toContain('tipo="audio"');
+    expect(directive).toContain(
+      'Nunca encerre sem ter enviado ao menos uma mensagem.',
+    );
   });
 
   it('documents every error code the M2M filter can emit', () => {

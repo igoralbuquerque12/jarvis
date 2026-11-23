@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { MessageUpsertType, WAMessage } from '@whiskeysockets/baileys';
+import type { IncomingAudio } from '../../assistant/dto/receive-message.dto';
 import { AssistantMainService } from '../../assistant/services/assistant-main.service';
+
+const DEFAULT_AUDIO_MIMETYPE = 'audio/ogg; codecs=opus';
 
 @Injectable()
 export class WhatsappReceiverService {
@@ -28,11 +31,13 @@ export class WhatsappReceiverService {
 
       const participant = message.key.participant ?? undefined;
       const text = this.getText(message);
+      const audio = this.getAudio(message);
       const dataMessage = {
         from,
         ...(participant !== undefined && { participant }),
         messageId,
         ...(text !== undefined && { text }),
+        ...(audio !== undefined && { audio }),
         message: {
           key: {
             remoteJid: from,
@@ -49,6 +54,29 @@ export class WhatsappReceiverService {
       void this.assistantMainService.receiveMessage(dataMessage);
     }
   };
+
+  /**
+   * Voice notes and audio files. The bytes stay on WhatsApp's servers until
+   * the assistant asks for them (`download`), after triage.
+   */
+  private getAudio(message: WAMessage): IncomingAudio | undefined {
+    const audio = message.message?.audioMessage;
+
+    if (!audio) {
+      return undefined;
+    }
+
+    return {
+      mimetype: audio.mimetype || DEFAULT_AUDIO_MIMETYPE,
+      seconds: Number(audio.seconds ?? 0),
+      download: async () => {
+        const { downloadMediaMessage } =
+          await import('@whiskeysockets/baileys');
+
+        return downloadMediaMessage(message, 'buffer', {});
+      },
+    };
+  }
 
   private getText(message: WAMessage): string | undefined {
     const content = message.message;

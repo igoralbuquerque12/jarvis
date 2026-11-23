@@ -26,7 +26,7 @@ O projeto reúne quatro partes principais:
 3. Nas próximas mensagens, o server recupera o perfil e o histórico recente, monta o contexto do assistente e envia a solicitação ao workflow n8n.
 4. O modelo interpreta a intenção. Quando precisa executar uma ação, o n8n chama uma ferramenta do server, como criar um lembrete ou registrar uma despesa.
 5. Operações financeiras são traduzidas pelo server e encaminhadas à API interna do Securo. Eventos são persistidos pelo próprio Jarvis e processados pelo scheduler.
-6. O resultado retorna pelo n8n, é salvo no histórico e enviado ao usuário no WhatsApp.
+6. O assistente responde chamando a ferramenta de envio de mensagem do server, que entrega cada mensagem no WhatsApp e a salva no histórico. Áudios enviados pelo usuário são transcritos pelo server antes de chegar ao modelo.
 
 O modelo de linguagem não acessa diretamente o banco, o WhatsApp ou o Securo. Toda operação passa pelos contratos e validações do backend.
 

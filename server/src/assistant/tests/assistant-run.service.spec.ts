@@ -10,7 +10,7 @@ describe('AssistantRunService', () => {
   function makeService() {
     const assistantRun = {
       create: jest.fn(),
-      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findUnique: jest.fn(),
     };
     const service = new AssistantRunService({
@@ -49,13 +49,13 @@ describe('AssistantRunService', () => {
     });
   });
 
-  it('completes a run with finishedAt', async () => {
+  it('completes only a PROCESSING run, with finishedAt', async () => {
     const { service, assistantRun } = makeService();
 
-    await service.complete(runId);
+    await expect(service.complete(runId)).resolves.toBe(true);
 
-    expect(assistantRun.update).toHaveBeenCalledWith({
-      where: { id: runId },
+    expect(assistantRun.updateMany).toHaveBeenCalledWith({
+      where: { id: runId, status: AssistantRunStatus.PROCESSING },
       data: {
         status: AssistantRunStatus.COMPLETED,
         finishedAt: expect.any(Date) as Date,
@@ -63,14 +63,28 @@ describe('AssistantRunService', () => {
     });
   });
 
+  it('is a no-op when the run was already finished (idempotent)', async () => {
+    const { service, assistantRun } = makeService();
+    assistantRun.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.complete(runId)).resolves.toBe(false);
+    await expect(service.fail(runId, 'late failure')).resolves.toBe(false);
+  });
+
   it('fails a run keeping a bounded reason', async () => {
     const { service, assistantRun } = makeService();
 
     await service.fail(runId, 'x'.repeat(5000));
 
-    const [[call]] = assistantRun.update.mock.calls as [
-      [{ data: { status: string; error: string; finishedAt: Date } }],
+    const [[call]] = assistantRun.updateMany.mock.calls as [
+      [
+        {
+          where: { status: string };
+          data: { status: string; error: string; finishedAt: Date };
+        },
+      ],
     ];
+    expect(call.where.status).toBe(AssistantRunStatus.PROCESSING);
     expect(call.data.status).toBe(AssistantRunStatus.FAILED);
     expect(call.data.error).toHaveLength(2000);
     expect(call.data.finishedAt).toBeInstanceOf(Date);
