@@ -2,12 +2,7 @@ import { Link } from 'react-router-dom';
 import { Alert } from '../../../components/ui/alert';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import {
-  IconArrowRight,
-  IconList,
-  IconPlus,
-  IconTarget,
-} from '../../../components/ui/icons';
+import { IconArrowRight, IconPlus } from '../../../components/ui/icons';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
 import { Stat } from '../../../components/ui/stat';
@@ -88,7 +83,7 @@ export function FinanceOverviewPage() {
             </div>
           ) : data.items.length === 0 ? (
             <div style={{ padding: '0 24px 24px' }}>
-              <EmptyState icon={<IconList />} title="Nada registrado este mês">
+              <EmptyState title="Nada registrado este mês">
                 Registre pelo site ou mande «gastei 40 no almoço» para o
                 Jarvis.
               </EmptyState>
@@ -118,7 +113,6 @@ export function FinanceOverviewPage() {
           </div>
         ) : activeGoals.length === 0 ? (
           <EmptyState
-            icon={<IconTarget />}
             title="Nenhuma meta em andamento"
             action={
               <Link to="/financas/metas" className="btn btn--ghost btn--sm">

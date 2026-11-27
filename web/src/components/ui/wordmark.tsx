@@ -1,8 +1,10 @@
 import type { SVGProps } from 'react';
+import { JarvisPersona } from './jarvis-persona';
 
 /**
  * The Jarvis "note" icon, monochrome: the tile takes the theme's ink and the
- * glyph its ground (colours come from `.mark__*` in index.css).
+ * glyph its ground (colours come from `.mark__*` in index.css). The app's
+ * lockup uses Jarvis's face instead; this stays as the logo (favicon).
  */
 export function JarvisMark({ className, ...props }: SVGProps<SVGSVGElement>) {
   return (
@@ -31,7 +33,7 @@ interface WordmarkProps {
 export function Wordmark({ size = 'sm', tagline = false }: WordmarkProps) {
   return (
     <span className={size === 'lg' ? 'lockup lockup--lg' : 'lockup'}>
-      <JarvisMark className="lockup__icon" />
+      <JarvisPersona variant="icon" className="lockup__icon" />
       <span className="lockup__text">
         <span className="lockup__name">Jarvis</span>
         {tagline ? (

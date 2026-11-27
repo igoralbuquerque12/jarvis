@@ -3,11 +3,7 @@ import { Alert } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { EmptyState } from '../../components/ui/empty-state';
-import {
-  IconCheck,
-  IconClose,
-  IconLayers,
-} from '../../components/ui/icons';
+import { IconCheck, IconClose } from '../../components/ui/icons';
 import { PageHeader } from '../../components/ui/page-header';
 import { Spinner } from '../../components/ui/spinner';
 import { useMyProfile } from '../../hooks/use-my-profile';
@@ -57,7 +53,7 @@ export function PlansPage() {
       ) : !plans ? (
         <Spinner page />
       ) : plans.length === 0 ? (
-        <EmptyState icon={<IconLayers />} title="Nenhum plano disponível">
+        <EmptyState title="Nenhum plano disponível">
           Volte em breve. Estamos preparando as opções.
         </EmptyState>
       ) : (

@@ -4,7 +4,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import { IconPlus, IconTarget } from '../../../components/ui/icons';
+import { IconPlus } from '../../../components/ui/icons';
 import { Modal, ModalActions } from '../../../components/ui/modal';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
@@ -265,7 +265,6 @@ export function FinanceGoalsPage() {
       ) : goals.length === 0 ? (
         <Card>
           <EmptyState
-            icon={<IconTarget />}
             title="Nenhuma meta ainda"
             action={
               <Button variant="ghost" onClick={() => setCreating(true)}>

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import { IconArrowRight, IconTarget } from '../../../components/ui/icons';
+import { IconArrowRight } from '../../../components/ui/icons';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyGoals } from '../../../hooks/use-my-goals';
 import { GoalCard } from '../../finance/components/goal-card';
@@ -36,7 +36,7 @@ export function DashGoalsCard() {
           <Spinner />
         </div>
       ) : visible.length === 0 ? (
-        <EmptyState icon={<IconTarget />} title="Nenhuma meta em andamento">
+        <EmptyState title="Nenhuma meta em andamento">
           Crie uma meta em Finanças ou peça ao Jarvis no WhatsApp.
         </EmptyState>
       ) : (

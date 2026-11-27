@@ -5,7 +5,7 @@ import { Badge } from '../../../components/ui/badge';
 import { IconButton } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import { IconBell, IconTrash } from '../../../components/ui/icons';
+import { IconTrash } from '../../../components/ui/icons';
 import { Spinner } from '../../../components/ui/spinner';
 import { describeRecurrence, formatEventInstant } from '../../../lib/format';
 import { cancelMyEventSeries } from '../../../services/events.service';
@@ -135,7 +135,7 @@ export function EventsCard({
       ) : error ? (
         <Alert variant="error">{error}</Alert>
       ) : events.length === 0 ? (
-        <EmptyState icon={<IconBell />} title="Nada agendado">
+        <EmptyState title="Nada agendado">
           Peça ao Jarvis no WhatsApp. Por exemplo: «me lembra amanhã às 9h de
           pagar o boleto».
         </EmptyState>

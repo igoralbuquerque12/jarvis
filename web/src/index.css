@@ -59,6 +59,12 @@
   --switch-knob: #ffffff;
   --mark-tile: #0f1a30;
   --mark-glyph: #f7f3eb;
+  --persona-body: #1e3566;
+  --persona-eye: #f7f3eb;
+  --persona-bubble: #fdfbf6;
+  --persona-bubble-edge: rgba(15, 26, 48, 0.14);
+  --persona-line: #1e3566;
+  --persona-shadow: rgba(15, 26, 48, 0.1);
   --chart-grid: rgba(15, 26, 48, 0.08);
   --backdrop: rgba(15, 26, 48, 0.34);
 
@@ -146,6 +152,12 @@
     --switch-knob: #f2f3f5;
     --mark-tile: #f2f3f5;
     --mark-glyph: #08090a;
+    --persona-body: #f2f3f5;
+    --persona-eye: #08090a;
+    --persona-bubble: #18191c;
+    --persona-bubble-edge: rgba(255, 255, 255, 0.13);
+    --persona-line: #93a8f5;
+    --persona-shadow: rgba(255, 255, 255, 0.06);
     --chart-grid: rgba(255, 255, 255, 0.07);
     --backdrop: rgba(0, 0, 0, 0.62);
 
@@ -201,6 +213,12 @@
   --switch-knob: #f2f3f5;
   --mark-tile: #f2f3f5;
   --mark-glyph: #08090a;
+  --persona-body: #f2f3f5;
+  --persona-eye: #08090a;
+  --persona-bubble: #18191c;
+  --persona-bubble-edge: rgba(255, 255, 255, 0.13);
+  --persona-line: #93a8f5;
+  --persona-shadow: rgba(255, 255, 255, 0.06);
   --chart-grid: rgba(255, 255, 255, 0.07);
   --backdrop: rgba(0, 0, 0, 0.62);
 
@@ -986,22 +1004,9 @@ details summary {
   color: var(--ink-soft);
 }
 
-.empty__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin-bottom: 6px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: var(--surface-raised);
-  color: var(--ink-soft);
-}
-
-.empty__icon .icon {
-  width: 17px;
-  height: 17px;
+.empty .persona {
+  width: 52px;
+  margin-bottom: 8px;
 }
 
 .empty__title,
@@ -1260,7 +1265,20 @@ details summary {
 
 .auth__mark {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.auth__mark .persona {
+  width: 168px;
+}
+
+.auth__mark .lockup__name {
+  font-size: 1.15rem;
+  letter-spacing: 0.34em;
+  /* the tracking trails the last letter; pull it back so the name centres */
+  margin-right: -0.34em;
 }
 
 .auth__card-head {
@@ -1386,6 +1404,128 @@ details summary {
 .lockup--lg .lockup__name {
   font-size: 1.15rem;
   letter-spacing: 0.34em;
+}
+
+/* ------------------------------------------------------------
+   Persona — o Jarvis como personagem (o logo relido)
+   ------------------------------------------------------------ */
+
+.persona {
+  display: block;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.persona__shadow {
+  fill: var(--persona-shadow);
+}
+
+.persona__body {
+  fill: var(--persona-body);
+}
+
+.persona__eyes {
+  fill: var(--persona-eye);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: persona-blink 6.5s infinite;
+}
+
+.persona__shine {
+  fill: var(--persona-body);
+}
+
+.persona__bubble {
+  fill: var(--persona-bubble);
+  stroke: var(--persona-bubble-edge);
+  stroke-width: 3;
+}
+
+.persona__line {
+  fill: var(--persona-line);
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+
+.persona__line--2 {
+  opacity: 0.66;
+}
+
+.persona__line--3 {
+  opacity: 0.36;
+}
+
+/* Pisca de vez em quando: o único sinal de vida, discreto */
+@keyframes persona-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.12);
+  }
+}
+
+/* greet: as três linhas se escrevem uma vez, em sequência */
+.persona--greet .persona__line {
+  animation: persona-write 0.5s var(--ease-out) both;
+}
+
+.persona--greet .persona__line--1 {
+  animation-delay: 0.25s;
+}
+
+.persona--greet .persona__line--2 {
+  animation-delay: 0.4s;
+}
+
+.persona--greet .persona__line--3 {
+  animation-delay: 0.55s;
+}
+
+@keyframes persona-write {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* typing: as linhas pulsam como "digitando…" (carregamento de página) */
+.persona--typing .persona__line {
+  opacity: 0.25;
+  animation: persona-type 1.2s ease-in-out infinite;
+}
+
+.persona--typing .persona__line--2 {
+  animation-delay: 0.2s;
+}
+
+.persona--typing .persona__line--3 {
+  animation-delay: 0.4s;
+}
+
+@keyframes persona-type {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.persona-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin: 96px auto;
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.persona-loading .persona {
+  width: 120px;
 }
 
 /* ------------------------------------------------------------
@@ -1773,6 +1913,33 @@ details summary {
 /* ------------------------------------------------------------
    Conexão WhatsApp
    ------------------------------------------------------------ */
+
+/* Passos à esquerda, o Jarvis "esperando a mensagem" à direita */
+.connect-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px;
+}
+
+.connect-layout > .persona {
+  width: 190px;
+  margin-right: 8px;
+}
+
+@media (max-width: 720px) {
+  .connect-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .connect-layout > .persona {
+    display: none;
+  }
+}
+
+.connected-banner > .persona {
+  width: 40px;
+}
 
 .connect-steps {
   display: flex;
@@ -4039,9 +4206,14 @@ details summary {
     transition-duration: 0.01ms !important;
   }
 
-  .spinner {
+  .spinner,
+  .persona--typing .persona__line {
     animation-duration: 1.2s !important;
     animation-iteration-count: infinite !important;
+  }
+
+  .persona--typing .persona__line {
+    animation-duration: 2.4s !important;
   }
 }
 

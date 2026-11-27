@@ -4,7 +4,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import { IconLayers, IconPlus } from '../../../components/ui/icons';
+import { IconPlus } from '../../../components/ui/icons';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyDatabaseInformation } from '../../../hooks/use-my-database-information';
@@ -71,7 +71,6 @@ export function KnowledgePage() {
   } else if (items.length === 0) {
     body = (
       <EmptyState
-        icon={<IconLayers />}
         title="Nenhuma base de dados ainda"
         action={
           <Button onClick={() => setModal('new')}>
