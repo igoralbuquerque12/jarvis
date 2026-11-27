@@ -12,6 +12,7 @@ import {
   IconUser,
   IconWallet,
 } from '../ui/icons';
+import { ThemeToggle } from '../ui/theme-toggle';
 import { Wordmark } from '../ui/wordmark';
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
@@ -74,6 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span className="sidebar__user-mail">{session.user.email}</span>
               </div>
             ) : null}
+            <ThemeToggle />
             <button
               type="button"
               className="icon-btn"
@@ -88,10 +90,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
         <div className="shell__main">
           <main className="shell__content">{children}</main>
-          <footer className="shell__footer">
-            <span>Jarvis — assistente pessoal por WhatsApp</span>
-            <span>Lembretes, finanças e metas na sua conversa.</span>
-          </footer>
         </div>
       </div>
     </PrivacyProvider>
