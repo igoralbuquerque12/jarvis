@@ -1,17 +1,18 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "claude-design": {
       "source": "jiji262/claude-design-skill",
       "sourceType": "github",
       "skillPath": "SKILL.md",
-      "computedHash": "f0fb7554ec060121d2e1c07115fe2d47d4740312b98164635bb874170dd75aae"
+      "computedHash": "447aca8924d2b65ecc9b4f1f8a9c23645ca56cf7d8772342ae70acb3dd54bc13"
     },
     "impeccable": {
       "source": "pbakaus/impeccable",
+      "commit": "2fc5e1459efbbf06d92c7306517c286bf12490cf",
       "sourceType": "github",
       "skillPath": ".agents/skills/impeccable/SKILL.md",
-      "computedHash": "439bb6cc56565d56e51825808b978468fb802d7ec9a593b8b045701b1569b6a6"
+      "computedHash": "ba5494cb853df34dc3284176083f954829717c42474107d5d01934b2f43930b4"
     }
   }
 }
