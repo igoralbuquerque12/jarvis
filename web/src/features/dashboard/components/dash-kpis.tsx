@@ -65,7 +65,7 @@ export function DashKpis({ events, timezone }: DashKpisProps) {
           next
             ? (() => {
                 const instant = formatEventInstant(next.scheduledAt, timezone);
-                return `${instant.weekday}, ${instant.day} ${instant.month} · ${instant.time}`;
+                return `${instant.weekdayShort}, ${instant.day} ${instant.month} · ${instant.time}`;
               })()
             : 'Peça ao Jarvis no WhatsApp'
         }

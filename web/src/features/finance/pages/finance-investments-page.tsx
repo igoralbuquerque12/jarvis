@@ -206,7 +206,6 @@ export function FinanceInvestmentsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Finanças"
         title="Investimentos"
         description="Sua carteira: ações, cripto, renda fixa e imóveis."
         actions={

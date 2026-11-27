@@ -1,13 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="jv" x1="0" y1="0" x2="0.55" y2="1">
-      <stop offset="0" stop-color="#FF9142" />
-      <stop offset="1" stop-color="#EE5A05" />
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="16" fill="url(#jv)" />
-  <circle cx="17.5" cy="17.5" r="4.5" fill="#FFF6EC" />
-  <rect x="13" y="28" width="38" height="6" rx="3" fill="#FFF6EC" opacity="0.95" />
-  <rect x="13" y="39" width="30" height="6" rx="3" fill="#FFE3C6" opacity="0.85" />
-  <rect x="13" y="50" width="21" height="6" rx="3" fill="#FFD3AB" opacity="0.75" />
+  <style>
+    .tile { fill: #0f1a30; }
+    .glyph { fill: #f7f3eb; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #f2f3f5; }
+      .glyph { fill: #08090a; }
+    }
+  </style>
+  <rect class="tile" width="64" height="64" rx="16" />
+  <g class="glyph">
+    <circle cx="17.5" cy="17.5" r="4.5" />
+    <rect x="13" y="28" width="38" height="6" rx="3" />
+    <rect x="13" y="39" width="30" height="6" rx="3" opacity="0.72" />
+    <rect x="13" y="50" width="21" height="6" rx="3" opacity="0.48" />
+  </g>
 </svg>

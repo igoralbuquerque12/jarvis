@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge } from '../../../components/ui/badge';
 import { Card } from '../../../components/ui/card';
+import { PageHeader } from '../../../components/ui/page-header';
 import { apiBaseUrl } from '../../../lib/config';
 import { CodeBlock } from '../components/code-block';
 
@@ -84,15 +84,11 @@ export function ApiDocsPage() {
   const baseUrl = apiBaseUrl;
 
   return (
-    <>
-      <div className="page-head">
-        <h2>Documentação da API</h2>
-        <p>
-          Tudo que você precisa para acionar o Jarvis a partir de scripts,
-          automações e outros serviços.
-        </p>
-        <span className="sunset-bar" aria-hidden="true" />
-      </div>
+    <div className="page">
+      <PageHeader
+        title="Documentação da API"
+        description="Tudo que você precisa para acionar o Jarvis a partir de scripts, automações e outros serviços."
+      />
 
       <div className="docs-layout">
         <nav className="docs-toc" aria-label="Sumário">
@@ -118,7 +114,7 @@ export function ApiDocsPage() {
               <h4>Endereço base</h4>
               <CodeBlock code={`${baseUrl}/v1`} label="Base URL" />
               <p className="docs-note">
-                Versão atual: <Badge variant="accent">v1</Badge>. Mudanças
+                Versão atual: <span className="key-chip">v1</span>. Mudanças
                 incompatíveis virão em uma nova versão, sem quebrar as chamadas
                 existentes.
               </p>
@@ -275,6 +271,6 @@ export function ApiDocsPage() {
           </Card>
         </div>
       </div>
-    </>
+    </div>
   );
 }

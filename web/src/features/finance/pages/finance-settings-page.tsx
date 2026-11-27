@@ -282,7 +282,6 @@ export function FinanceSettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Finanças"
         title="Contas, categorias e regras"
         description="A estrutura por trás dos seus lançamentos."
       />
