@@ -18,6 +18,7 @@ export function formatEventInstant(iso: string, timezone: string) {
     day: part({ day: '2-digit' }),
     month: part({ month: 'short' }).replace('.', ''),
     weekday: part({ weekday: 'long' }),
+    weekdayShort: part({ weekday: 'short' }).replace('.', ''),
     time: part({ hour: '2-digit', minute: '2-digit' }),
     full: part({ dateStyle: 'full', timeStyle: 'short' }),
   };
