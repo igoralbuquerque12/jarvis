@@ -66,9 +66,8 @@ export function DashboardPage() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow={todayLabel()}
         title={`${timeOfDayGreeting()}, ${firstName}`}
-        description="TESTES Os lembretes, o mês financeiro e as metas em andamento."
+        description={`${todayLabel()} · Os lembretes, o mês financeiro e as metas em andamento.`}
         actions={
           <>
             <Link

@@ -248,7 +248,6 @@ export function FinanceGoalsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Finanças"
         title="Metas"
         description="Objetivos de economia e quanto falta para cada um."
         actions={

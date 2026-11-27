@@ -79,7 +79,6 @@ function ProfileView({
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Perfil"
         title="Sobre você"
         description="O que você escreve aqui vira contexto para o Jarvis. Quanto mais ele souber, melhores ficam as respostas."
       />

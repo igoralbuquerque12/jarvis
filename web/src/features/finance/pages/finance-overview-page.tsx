@@ -34,7 +34,6 @@ export function FinanceOverviewPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Finanças"
         title={formatYearMonth(ym)}
         description="Resumo do mês, evolução dos últimos meses e metas em andamento."
         actions={

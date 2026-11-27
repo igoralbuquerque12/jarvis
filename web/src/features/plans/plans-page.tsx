@@ -48,7 +48,6 @@ export function PlansPage() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Planos"
         title="Escolha seu ritmo"
         description="Compare o que cada plano libera no Jarvis pelo WhatsApp. A troca de plano estará disponível em breve."
       />
@@ -98,9 +97,10 @@ export function PlansPage() {
                 </ul>
                 <div className="plan-card__cta">
                   {isCurrent ? (
-                    <Button variant="ghost" block disabled>
+                    <p className="plan-card__current">
+                      <IconCheck />
                       Plano atual
-                    </Button>
+                    </p>
                   ) : (
                     <Button block disabled title="Troca de plano em breve">
                       Em breve

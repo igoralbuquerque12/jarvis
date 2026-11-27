@@ -243,7 +243,10 @@ function LedgerView({
               <section key={group.date} className="tx-group">
                 <header className="tx-group__head">
                   <span>{describeISODate(group.date)}</span>
-                  <Amount value={group.net} colored />
+                  {/* A single entry already shows its amount on the row. */}
+                  {group.items.length > 1 ? (
+                    <Amount value={group.net} colored />
+                  ) : null}
                 </header>
                 <ul className="tx-list">
                   {group.items.map((tx) => (
@@ -458,7 +461,6 @@ export function FinanceTransactionsPage({ view }: { view: View }) {
   return (
     <>
       <PageHeader
-        eyebrow="Finanças"
         title="Transações"
         description={
           view === 'ledger'
