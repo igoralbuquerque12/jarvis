@@ -4,15 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#eee8dc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#08090a" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
       content="Jarvis — seu assistente pessoal no WhatsApp"
     />
     <title>Jarvis</title>
+    <script>
+      // Apply a remembered theme before first paint (see src/lib/theme.ts).
+      try {
+        var theme = localStorage.getItem('jarvis-theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (error) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=Michroma&display=swap"
       rel="stylesheet"
     />
   </head>
