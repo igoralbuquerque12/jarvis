@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Alert } from '../../components/ui/alert';
 import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
 import { Field, TextInput } from '../../components/ui/field';
 import { Segmented } from '../../components/ui/segmented';
 import { Spinner } from '../../components/ui/spinner';
@@ -24,7 +23,8 @@ function errorMessage(error: unknown, fallback: string) {
 const HEADINGS: Record<Mode, { title: string; subtitle: string }> = {
   signIn: {
     title: 'Bem-vindo de volta',
-    subtitle: 'Entre para ver seus lembretes, gastos e metas.',
+    subtitle:
+      'Lembretes, gastos, contas fixas, metas e investimentos, organizados pela sua conversa no WhatsApp.',
   },
   signUp: {
     title: 'Criar sua conta',
@@ -94,9 +94,9 @@ export function LoginPage() {
 
   return (
     <AuthLayout>
-      <Card>
+      <section aria-labelledby="auth-title">
         <div className="auth__card-head">
-          <h2>{heading.title}</h2>
+          <h2 id="auth-title">{heading.title}</h2>
           <p>{heading.subtitle}</p>
         </div>
 
@@ -199,7 +199,7 @@ export function LoginPage() {
             </div>
           </div>
         </form>
-      </Card>
+      </section>
     </AuthLayout>
   );
 }

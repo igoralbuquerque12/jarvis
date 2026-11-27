@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Alert } from '../../components/ui/alert';
 import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
 import { Field, TextInput } from '../../components/ui/field';
 import { resetPassword } from './auth.service';
 import { AuthLayout } from './components/auth-layout';
@@ -45,9 +44,9 @@ export function ResetPasswordPage() {
 
   return (
     <AuthLayout>
-      <Card>
+      <section aria-labelledby="auth-title">
         <div className="auth__card-head">
-          <h2>Nova senha</h2>
+          <h2 id="auth-title">Nova senha</h2>
           <p>Escolha uma nova senha para a sua conta.</p>
         </div>
 
@@ -105,7 +104,7 @@ export function ResetPasswordPage() {
             </div>
           </form>
         )}
-      </Card>
+      </section>
     </AuthLayout>
   );
 }
