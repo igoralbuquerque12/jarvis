@@ -3,6 +3,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { IconCopy } from '../../../components/ui/icons';
+import { JarvisPersona } from '../../../components/ui/jarvis-persona';
 import { assistantWhatsappNumber } from '../../../lib/config';
 import { getMyProfile } from '../../../services/profile.service';
 import type { ProfileMe } from '../../../types/api';
@@ -83,7 +84,7 @@ export function WhatsappCard({
           aside={<Badge variant="success">Conectado</Badge>}
         />
         <div className="connected-banner">
-          <span className="connected-banner__dot" aria-hidden="true" />
+          <JarvisPersona variant="face" />
           <div>
             <strong>Tudo certo por aqui.</strong>
             <p className="muted small">
@@ -113,6 +114,7 @@ export function WhatsappCard({
         subtitle="Vincule seu número em menos de um minuto."
         aside={<Badge variant="accent">Pendente</Badge>}
       />
+      <div className="connect-layout">
       <ol className="connect-steps">
         <li>
           <strong>Copie a mensagem de conexão</strong>
@@ -153,6 +155,8 @@ export function WhatsappCard({
           ) : null}
         </li>
       </ol>
+      <JarvisPersona />
+      </div>
       <p className="hint" style={{ marginTop: 18 }}>
         Seu token é pessoal. Não compartilhe com ninguém.
       </p>
