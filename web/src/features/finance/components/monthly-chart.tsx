@@ -18,8 +18,10 @@ interface MonthData {
   Despesa: number;
 }
 
-const INCOME = '#2f8f5b';
-const EXPENSE = '#c34a2b';
+// Theme tokens from index.css, so the chart follows the light/dark theme.
+const INCOME = 'var(--success)';
+const EXPENSE = 'var(--danger)';
+const AXIS = { fontSize: 11, fill: 'var(--ink-faint)', fontFamily: 'Inter' };
 
 function formatBRLShort(value: number): string {
   if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
@@ -101,44 +103,47 @@ export function MonthlyChart({ months = 6 }: { months?: number }) {
           <CartesianGrid
             strokeDasharray="3 3"
             vertical={false}
-            stroke="rgba(34,27,16,0.08)"
+            stroke="var(--chart-grid)"
           />
           <XAxis
             dataKey="month"
-            tick={{ fontSize: 11, fill: '#a2957f', fontFamily: 'Space Grotesk' }}
+            tick={AXIS}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             tickFormatter={hidden ? () => '' : formatBRLShort}
-            tick={{ fontSize: 10, fill: '#a2957f', fontFamily: 'Space Grotesk' }}
+            tick={AXIS}
             axisLine={false}
             tickLine={false}
             width={hidden ? 12 : 64}
           />
           <Tooltip
-            cursor={{ fill: 'rgba(244,105,15,0.06)' }}
+            cursor={{ fill: 'var(--surface-hover)' }}
             formatter={(value) =>
               hidden ? '••••' : formatBRL(typeof value === 'number' ? value : 0)
             }
             contentStyle={{
-              background: '#fffdf8',
-              border: '1px solid #e9dfcd',
-              borderRadius: 10,
-              fontFamily: 'Space Grotesk',
+              background: 'var(--surface-raised)',
+              border: '1px solid var(--line-strong)',
+              borderRadius: 8,
+              boxShadow: 'var(--shadow-pop)',
+              color: 'var(--ink)',
+              fontFamily: 'Inter',
               fontSize: 13,
             }}
+            labelStyle={{ color: 'var(--ink-soft)', marginBottom: 2 }}
           />
           <Bar
             dataKey="Receita"
             fill={INCOME}
-            radius={[4, 4, 0, 0]}
+            radius={[3, 3, 0, 0]}
             isAnimationActive={false}
           />
           <Bar
             dataKey="Despesa"
             fill={EXPENSE}
-            radius={[4, 4, 0, 0]}
+            radius={[3, 3, 0, 0]}
             isAnimationActive={false}
           />
         </BarChart>
