@@ -50,7 +50,7 @@ function AccountsCard() {
       ) : error ? (
         <Alert variant="error">{error}</Alert>
       ) : accounts.length === 0 ? (
-        <EmptyState icon={<IconWallet />} title="Nenhuma conta">
+        <EmptyState title="Nenhuma conta">
           A conta padrão é criada automaticamente pelo Jarvis.
         </EmptyState>
       ) : (
@@ -258,7 +258,7 @@ function RulesCard() {
       ) : error ? (
         <Alert variant="error">{error}</Alert>
       ) : rules.length === 0 ? (
-        <EmptyState icon={<IconTag />} title="Nenhuma regra">
+        <EmptyState title="Nenhuma regra">
           Exemplo: «toda compra com "uber" vai para Transporte».
         </EmptyState>
       ) : (

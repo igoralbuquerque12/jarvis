@@ -3,7 +3,7 @@ import { Alert } from '../../../components/ui/alert';
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import { IconBriefcase, IconPlus } from '../../../components/ui/icons';
+import { IconPlus } from '../../../components/ui/icons';
 import { Modal, ModalActions } from '../../../components/ui/modal';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
@@ -243,7 +243,6 @@ export function FinanceInvestmentsPage() {
       ) : assets.length === 0 ? (
         <Card>
           <EmptyState
-            icon={<IconBriefcase />}
             title="Nenhum ativo cadastrado"
             action={
               <Button variant="ghost" onClick={() => setCreating(true)}>

@@ -8,9 +8,7 @@ import { EmptyState } from '../../../components/ui/empty-state';
 import {
   IconChevronLeft,
   IconChevronRight,
-  IconList,
   IconPlus,
-  IconRepeat,
   IconSearch,
 } from '../../../components/ui/icons';
 import { PageHeader } from '../../../components/ui/page-header';
@@ -229,7 +227,6 @@ function LedgerView({
         ) : data.items.length === 0 ? (
           <div style={{ padding: 24 }}>
             <EmptyState
-              icon={<IconList />}
               title={filtered ? 'Nada encontrado' : 'Nenhum lançamento neste mês'}
             >
               {filtered
@@ -373,7 +370,7 @@ function RecurringView({
         <Alert variant="error">{error}</Alert>
       ) : recurring.length === 0 ? (
         <Card>
-          <EmptyState icon={<IconRepeat />} title="Nenhuma conta fixa">
+          <EmptyState title="Nenhuma conta fixa">
             Cadastre salário, aluguel e assinaturas para prever o mês antes de
             ele começar.
           </EmptyState>

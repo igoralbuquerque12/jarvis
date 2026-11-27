@@ -5,7 +5,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader } from '../../../components/ui/card';
 import { EmptyState } from '../../../components/ui/empty-state';
-import { IconActivity, IconPlus } from '../../../components/ui/icons';
+import { IconPlus } from '../../../components/ui/icons';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Spinner } from '../../../components/ui/spinner';
 import { useMyHealthChecks } from '../../../hooks/use-my-health-checks';
@@ -88,7 +88,6 @@ export function HealthCheckPage() {
   } else if (configs.length === 0) {
     body = (
       <EmptyState
-        icon={<IconActivity />}
         title="Nenhuma API vigiada ainda"
         action={
           <Button onClick={() => setModal('new')}>

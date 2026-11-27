@@ -6,7 +6,6 @@ import { Button, IconButton } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { EmptyState } from '../../components/ui/empty-state';
 import {
-  IconBell,
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
@@ -190,7 +189,6 @@ function EventsView({
         ) : data.items.length === 0 ? (
           <div style={{ padding: 24 }}>
             <EmptyState
-              icon={<IconBell />}
               title={
                 filtered
                   ? 'Nada encontrado'
